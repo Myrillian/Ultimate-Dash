@@ -49,3 +49,29 @@ export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value', { mode: 'json' }).notNull(),
 });
+
+export const users = sqliteTable('users', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  username: text('username').notNull().unique(),
+  passwordHash: text('password_hash'),
+  role: text('role', { enum: ['admin', 'viewer'] })
+    .notNull()
+    .default('viewer'),
+  createdAt: timestamps.createdAt,
+  lastLoginAt: text('last_login_at'),
+});
+
+export const sessions = sqliteTable(
+  'sessions',
+  {
+    /** SHA-256 des Tokens; das Token selbst steht nur im Cookie. */
+    id: text('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: text('expires_at').notNull(),
+    createdAt: timestamps.createdAt,
+    userAgent: text('user_agent'),
+  },
+  (table) => [index('sessions_user_idx').on(table.userId)],
+);

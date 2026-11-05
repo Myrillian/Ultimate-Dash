@@ -1,4 +1,11 @@
 import type {
+  AuthStatus,
+  LoginInput,
+  PasswordChangeInput,
+  SetupInput,
+  User,
+  UserCreateInput,
+  UserUpdateInput,
   DashboardData,
   Group,
   GroupInput,
@@ -22,12 +29,19 @@ export class ApiError extends Error {
   }
 }
 
+let onUnauthorized: (() => void) | undefined;
+/** Wird aufgerufen, wenn die Session abgelaufen ist (z. B. um zum Login zu wechseln). */
+export function setUnauthorizedHandler(handler: () => void) {
+  onUnauthorized = handler;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const response = await fetch(`/api${path}`, {
     method,
     headers: body === undefined ? undefined : { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+  if (response.status === 401 && !path.startsWith('/auth/')) onUnauthorized?.();
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -37,6 +51,16 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
+  authStatus: () => request<AuthStatus>('GET', '/auth/status'),
+  setup: (input: SetupInput) => request<User>('POST', '/auth/setup', input),
+  login: (input: LoginInput) => request<User>('POST', '/auth/login', input),
+  logout: () => request<void>('POST', '/auth/logout'),
+  changePassword: (input: PasswordChangeInput) => request<void>('POST', '/auth/password', input),
+  listUsers: () => request<User[]>('GET', '/users'),
+  createUser: (input: UserCreateInput) => request<User>('POST', '/users', input),
+  updateUser: (id: number, input: UserUpdateInput) => request<User>('PUT', `/users/${id}`, input),
+  deleteUser: (id: number) => request<void>('DELETE', `/users/${id}`),
+
   dashboard: () => request<DashboardData>('GET', '/dashboard'),
   status: () => request<ServiceStatus[]>('GET', '/status'),
   createGroup: (input: GroupInput) => request<Group>('POST', '/groups', input),

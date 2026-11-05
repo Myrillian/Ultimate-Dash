@@ -1,4 +1,5 @@
 import Fastify, { type FastifyServerOptions } from 'fastify';
+import fastifyCookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -7,6 +8,10 @@ import type { AppConfig } from './config.js';
 import { openDatabase } from './db/client.js';
 import { createRepository, NotFoundError, ValidationError } from './db/repository.js';
 import { EventHub } from './events.js';
+import { registerAuthGuard } from './auth/guard.js';
+import { LoginRateLimiter } from './auth/rate-limit.js';
+import { authRoutes } from './auth/routes.js';
+import { createAuthStore } from './auth/store.js';
 import { apiRoutes } from './routes/api.js';
 import { StatusMonitor } from './status/monitor.js';
 
@@ -23,6 +28,7 @@ export async function buildApp(
 
   const { db, close } = openDatabase(config.databaseFile, config.migrationsFolder);
   const repo = createRepository(db);
+  const authStore = createAuthStore(db);
   const events = new EventHub();
   const monitor = new StatusMonitor({
     intervalMs: config.statusIntervalSeconds * 1000,
@@ -53,6 +59,13 @@ export async function buildApp(
     return reply.code(500).send({ error: 'Interner Serverfehler' });
   });
 
+  await app.register(fastifyCookie);
+  registerAuthGuard(app, authStore);
+  await app.register(authRoutes, {
+    prefix: '/api',
+    store: authStore,
+    limiter: new LoginRateLimiter(),
+  });
   await app.register(apiRoutes, { prefix: '/api', repo, events, monitor });
 
   if (config.webRoot && existsSync(config.webRoot)) {
@@ -81,13 +94,17 @@ export async function buildApp(
     });
   }
 
+  const purge = setInterval(() => authStore.purgeExpiredSessions(), 6 * 60 * 60 * 1000);
+  purge.unref();
   app.addHook('onReady', async () => {
+    authStore.purgeExpiredSessions();
     if (options.startMonitor !== false) monitor.start();
   });
   app.addHook('onClose', async () => {
+    clearInterval(purge);
     monitor.stop();
     close();
   });
 
-  return { app, repo, monitor, events };
+  return { app, repo, authStore, monitor, events };
 }

@@ -65,6 +65,19 @@ pnpm format       # Formatierung
 | `LOG_LEVEL`               | `info`   | `debug`, `info`, `warn`, `error` |
 | `LOG_REQUESTS`            | `false`  | Jede HTTP-Anfrage loggen         |
 
+## Anmeldung und Benutzer
+
+Beim ersten Aufruf legst du im Browser ein Administrator-Konto an. Danach ist das Dashboard nur nach der Anmeldung erreichbar.
+
+- **Administrator**: darf alles bearbeiten und Benutzer verwalten (Benutzermenü oben rechts).
+- **Nur lesen**: sieht das Dashboard, kann aber nichts ändern.
+
+Passwörter werden mit scrypt gespeichert, Sitzungen laufen 30 Tage und verlängern sich bei Nutzung. Nach zehn Fehlversuchen in 15 Minuten wird die Anmeldung für diesen Benutzernamen und diese IP kurz gesperrt. Hinter einem Reverse-Proxy mit HTTPS wird das Cookie automatisch als `Secure` gesetzt, wenn der Proxy `X-Forwarded-Proto` mitsendet.
+
+**Admin-Passwort vergessen?** Container stoppen, die Datei `/data/ultimate-dash.db` sichern und auf dem Host die Tabellen `users` und `sessions` leeren, zum Beispiel mit `sqlite3 ultimate-dash.db "DELETE FROM sessions; DELETE FROM users;"` (das Image enthält kein `sqlite3`). Beim nächsten Aufruf startet die Ersteinrichtung erneut, Dashboard-Inhalte bleiben erhalten.
+
+Anmeldung über OIDC (z. B. Authentik, Keycloak) folgt in einem eigenen Schritt.
+
 ## Icons
 
 Im Icon-Feld eines Services oder einer Gruppe:
