@@ -1,0 +1,51 @@
+import { sql } from 'drizzle-orm';
+import { integer, sqliteTable, text, index } from 'drizzle-orm/sqlite-core';
+
+const timestamps = {
+  createdAt: text('created_at')
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  updatedAt: text('updated_at')
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+};
+
+export const groups = sqliteTable('groups', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  icon: text('icon'),
+  collapsed: integer('collapsed', { mode: 'boolean' }).notNull().default(false),
+  sortOrder: integer('sort_order').notNull().default(0),
+  ...timestamps,
+});
+
+export const services = sqliteTable(
+  'services',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    groupId: integer('group_id')
+      .notNull()
+      .references(() => groups.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    url: text('url').notNull(),
+    description: text('description'),
+    icon: text('icon'),
+    target: text('target', { enum: ['_blank', '_self'] })
+      .notNull()
+      .default('_blank'),
+    statusCheck: integer('status_check', { mode: 'boolean' }).notNull().default(true),
+    statusUrl: text('status_url'),
+    tags: text('tags', { mode: 'json' })
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'`),
+    sortOrder: integer('sort_order').notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [index('services_group_idx').on(table.groupId, table.sortOrder)],
+);
+
+export const settings = sqliteTable('settings', {
+  key: text('key').primaryKey(),
+  value: text('value', { mode: 'json' }).notNull(),
+});

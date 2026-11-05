@@ -57,6 +57,7 @@ Ein einziger Docker-Container (multi-arch, amd64/arm64) mit Web-Frontend, API-Ba
 **Phase 4 – Erweiterungen**
 
 - Rack-Ansicht mit Verknüpfung zu Geräten und IPs
+- Switch-Management: Switches mit Ports (Typ, Geschwindigkeit, PoE, VLANs), Belegung pro Port (Gerät, IP, Kabel/Patchfeld), Übersicht freier Ports; später optional Live-Daten per SNMP oder Hersteller-API (z. B. UniFi, MikroTik)
 - Status-Historie und Benachrichtigungen (z. B. ntfy, Gotify)
 - Weitere IPAM-Quellen (UniFi, OPNsense)
 - Workspace-View, MCP-Endpunkt
@@ -80,14 +81,6 @@ Ein einziger Docker-Container (multi-arch, amd64/arm64) mit Web-Frontend, API-Ba
 - Ein Technitium-Server bzw. Cluster pro Instanz; mehrere unabhängige Server wären ein späteres Feature.
 - SQLite: ideal für einen Container, nicht für mehrere parallele Instanzen (Hochverfügbarkeit).
 
-## Offene Entscheidungen
+## Entscheidungen
 
-| # | Frage | Empfehlung | Alternativen |
-| --- | --- | --- | --- |
-| 1 | Konfiguration | DB + UI-Editor, YAML-Export/Import | Nur YAML (wie Homepage); YAML als Quelle mit UI-Editor (wie Dashy) |
-| 2 | Tech-Stack | TypeScript durchgängig: SvelteKit + Fastify | React/Next.js; Go-Backend |
-| 3 | Benutzer | Lokaler Admin + optional OIDC, Rollen Admin/Lesen | Nur ein Passwort; volle Multi-User mit eigenen Dashboards |
-| 4 | Reihenfolge | Kern-Dashboard zuerst, dann IPAM | IPAM zuerst (falls das dein dringendstes Thema ist) |
-| 5 | DHCP-Server | Technitium ist DHCP-Server im Netz | DHCP läuft woanders (dann eingeschränktes IPAM) |
-| 6 | Rack-Ansicht | Später eigenes Modul, Rackula-Dateiformat lesen | Rackula nur verlinken; gar nicht |
-| 7 | Veröffentlichung | Privates Repo, später Open Source (MIT) | Gleich öffentlich; dauerhaft privat |
+Alle Punkte sind entschieden, siehe [Entscheidungen](04-entscheidungen.md).

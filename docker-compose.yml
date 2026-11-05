@@ -1,0 +1,12 @@
+services:
+  ultimate-dash:
+    build: .
+    container_name: ultimate-dash
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./data:/data
+    environment:
+      # Abstand der Statusprüfungen in Sekunden
+      STATUS_INTERVAL_SECONDS: 60
+    restart: unless-stopped
