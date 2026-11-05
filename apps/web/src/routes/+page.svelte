@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import type { Group, GroupInput, Service, ServiceInput } from '@ultimate-dash/shared';
   import { api, ApiError } from '$lib/api';
+  import { auth } from '$lib/auth.svelte';
   import { dashboard } from '$lib/dashboard.svelte';
   import { searchServices } from '$lib/search';
   import { theme } from '$lib/theme.svelte';
@@ -13,11 +14,14 @@
   import ServiceCard from '$lib/components/ServiceCard.svelte';
   import ServiceForm from '$lib/components/ServiceForm.svelte';
   import UiIcon from '$lib/components/UiIcon.svelte';
+  import UserMenu from '$lib/components/UserMenu.svelte';
 
   let query = $state('');
   let activeIndex = $state(0);
   let searchInput: HTMLInputElement | undefined = $state();
-  let editMode = $state(false);
+  let editModeRequested = $state(false);
+  // Bearbeiten nur für Admins; verliert jemand die Rolle, endet der Modus automatisch.
+  const editMode = $derived(auth.isAdmin && editModeRequested);
 
   // Dialog-Zustände
   let serviceDialog = $state<{ open: boolean; service: Service | null; groupId: number | null }>({
@@ -191,16 +195,19 @@
       >
         <UiIcon name={theme.current === 'dark' ? 'sun' : 'moon'} />
       </button>
-      <button
-        type="button"
-        class="btn"
-        class:btn-primary={editMode}
-        aria-pressed={editMode}
-        onclick={() => (editMode = !editMode)}
-      >
-        <UiIcon name={editMode ? 'check' : 'pencil'} size={16} />
-        {editMode ? 'Fertig' : 'Bearbeiten'}
-      </button>
+      <UserMenu />
+      {#if auth.isAdmin}
+        <button
+          type="button"
+          class="btn ml-1"
+          class:btn-primary={editMode}
+          aria-pressed={editMode}
+          onclick={() => (editModeRequested = !editModeRequested)}
+        >
+          <UiIcon name={editMode ? 'check' : 'pencil'} size={16} />
+          {editMode ? 'Fertig' : 'Bearbeiten'}
+        </button>
+      {/if}
     </div>
   </header>
 
@@ -257,20 +264,26 @@
           ><UiIcon name="layout" size={28} /></span
         >
         <h2 class="text-lg font-semibold">Willkommen bei Ultimate Dash</h2>
-        <p class="text-fg-muted">
-          Lege eine erste Gruppe an, zum Beispiel „Infrastruktur“, und füge dann deine Services
-          hinzu.
-        </p>
-        <button
-          type="button"
-          class="btn btn-primary mt-2"
-          onclick={() => {
-            editMode = true;
-            groupDialog = { open: true, group: null };
-          }}
-        >
-          <UiIcon name="plus" size={16} /> Erste Gruppe anlegen
-        </button>
+        {#if !auth.isAdmin}
+          <p class="text-fg-muted">
+            Noch sind keine Services eingetragen. Ein Administrator kann sie hinzufügen.
+          </p>
+        {:else}
+          <p class="text-fg-muted">
+            Lege eine erste Gruppe an, zum Beispiel „Infrastruktur“, und füge dann deine Services
+            hinzu.
+          </p>
+          <button
+            type="button"
+            class="btn btn-primary mt-2"
+            onclick={() => {
+              editModeRequested = true;
+              groupDialog = { open: true, group: null };
+            }}
+          >
+            <UiIcon name="plus" size={16} /> Erste Gruppe anlegen
+          </button>
+        {/if}
       </div>
     {:else}
       <div class="grid gap-x-6 gap-y-8 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">

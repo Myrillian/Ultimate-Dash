@@ -16,9 +16,16 @@ const config: AppConfig = {
 };
 
 let ctx: Awaited<ReturnType<typeof buildApp>>;
+let cookie = '';
 
 beforeEach(async () => {
   ctx = await buildApp(config, { logger: false, startMonitor: false });
+  const res = await ctx.app.inject({
+    method: 'POST',
+    url: '/api/auth/setup',
+    payload: { username: 'admin', password: 'ein-langes-passwort' },
+  });
+  cookie = String(res.headers['set-cookie']).split(';')[0]!;
 });
 afterEach(async () => {
   await ctx.app.close();
@@ -27,13 +34,19 @@ afterEach(async () => {
 const json = <T>(res: { body: string }) => JSON.parse(res.body) as T;
 
 async function createGroup(name: string) {
-  const res = await ctx.app.inject({ method: 'POST', url: '/api/groups', payload: { name } });
+  const res = await ctx.app.inject({
+    headers: { cookie },
+    method: 'POST',
+    url: '/api/groups',
+    payload: { name },
+  });
   expect(res.statusCode).toBe(201);
   return json<{ id: number }>(res);
 }
 
 async function createService(groupId: number, name: string) {
   const res = await ctx.app.inject({
+    headers: { cookie },
     method: 'POST',
     url: '/api/services',
     // statusCheck aus, damit im Test keine echten Anfragen rausgehen
@@ -44,7 +57,9 @@ async function createService(groupId: number, name: string) {
 }
 
 const dashboard = async () =>
-  json<DashboardData>(await ctx.app.inject({ method: 'GET', url: '/api/dashboard' }));
+  json<DashboardData>(
+    await ctx.app.inject({ headers: { cookie }, method: 'GET', url: '/api/dashboard' }),
+  );
 
 describe('API', () => {
   it('meldet sich gesund', async () => {
@@ -73,6 +88,7 @@ describe('API', () => {
   it('lehnt ungültige Eingaben mit 400 und Details ab', async () => {
     const group = await createGroup('Test');
     const res = await ctx.app.inject({
+      headers: { cookie },
       method: 'POST',
       url: '/api/services',
       payload: { groupId: group.id, name: '', url: 'javascript:alert(1)' },
@@ -84,6 +100,7 @@ describe('API', () => {
 
   it('gibt 404 für unbekannte Gruppen zurück', async () => {
     const res = await ctx.app.inject({
+      headers: { cookie },
       method: 'POST',
       url: '/api/services',
       payload: { groupId: 999, name: 'X', url: 'http://x.lan' },
@@ -95,6 +112,7 @@ describe('API', () => {
     const a = await createGroup('A');
     const b = await createGroup('B');
     const incomplete = await ctx.app.inject({
+      headers: { cookie },
       method: 'PUT',
       url: '/api/groups/order',
       payload: { ids: [b.id] },
@@ -102,6 +120,7 @@ describe('API', () => {
     expect(incomplete.statusCode).toBe(400);
 
     const ok = await ctx.app.inject({
+      headers: { cookie },
       method: 'PUT',
       url: '/api/groups/order',
       payload: { ids: [b.id, a.id] },
@@ -117,6 +136,7 @@ describe('API', () => {
     const s2 = await createService(b.id, 'Zwei');
 
     const res = await ctx.app.inject({
+      headers: { cookie },
       method: 'PUT',
       url: '/api/services/arrange',
       payload: { groupId: b.id, ids: [s1.id, s2.id] },
@@ -130,7 +150,11 @@ describe('API', () => {
   it('löscht beim Entfernen einer Gruppe auch ihre Services', async () => {
     const group = await createGroup('Weg');
     await createService(group.id, 'Alt');
-    const res = await ctx.app.inject({ method: 'DELETE', url: `/api/groups/${group.id}` });
+    const res = await ctx.app.inject({
+      headers: { cookie },
+      method: 'DELETE',
+      url: `/api/groups/${group.id}`,
+    });
     expect(res.statusCode).toBe(204);
     expect(ctx.repo.listServices()).toHaveLength(0);
   });
@@ -139,6 +163,7 @@ describe('API', () => {
     const group = await createGroup('G');
     const service = await createService(group.id, 'Alt');
     const res = await ctx.app.inject({
+      headers: { cookie },
       method: 'PUT',
       url: `/api/services/${service.id}`,
       payload: {
