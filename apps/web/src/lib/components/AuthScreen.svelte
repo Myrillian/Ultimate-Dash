@@ -2,6 +2,7 @@
   import { ApiError } from '$lib/api';
   import { auth } from '$lib/auth.svelte';
   import PasswordInput from './PasswordInput.svelte';
+  import UiIcon from './UiIcon.svelte';
 
   /** setup = Ersteinrichtung (erster Admin), login = Anmeldung */
   let { mode }: { mode: 'setup' | 'login' } = $props();
@@ -22,6 +23,7 @@
       return;
     }
     busy = true;
+    auth.loginError = null;
     try {
       if (mode === 'setup') await auth.setup({ username, password });
       else await auth.login({ username, password });
@@ -55,10 +57,21 @@
       onsubmit={submit}
       novalidate
     >
-      {#if generalError}
+      {#if generalError ?? (mode === 'login' ? auth.loginError : null)}
         <p class="rounded-lg bg-down/10 px-3 py-2 text-sm text-down" role="alert">
-          {generalError}
+          {generalError ?? auth.loginError}
         </p>
+      {/if}
+
+      {#if mode === 'login' && auth.oidc}
+        <a href="/api/auth/oidc/start" class="btn btn-primary w-full py-2.5">
+          <UiIcon name="key" size={16} />
+          {auth.oidc.label}
+        </a>
+        <div class="flex items-center gap-3 text-xs text-fg-muted" aria-hidden="true">
+          <span class="h-px flex-1 bg-line"></span> oder mit Passwort
+          <span class="h-px flex-1 bg-line"></span>
+        </div>
       {/if}
 
       <div>
@@ -100,7 +113,12 @@
         </div>
       {/if}
 
-      <button type="submit" class="btn btn-primary mt-1 w-full py-2.5" disabled={busy}>
+      <button
+        type="submit"
+        class="btn mt-1 w-full py-2.5"
+        class:btn-primary={mode === 'setup' || !auth.oidc}
+        disabled={busy}
+      >
         {#if busy}Bitte warten …{:else if mode === 'setup'}Konto anlegen{:else}Anmelden{/if}
       </button>
     </form>

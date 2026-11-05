@@ -9,6 +9,7 @@ import { openDatabase } from './db/client.js';
 import { createRepository, NotFoundError, ValidationError } from './db/repository.js';
 import { EventHub } from './events.js';
 import { registerAuthGuard } from './auth/guard.js';
+import { createOidc } from './auth/oidc.js';
 import { LoginRateLimiter } from './auth/rate-limit.js';
 import { authRoutes } from './auth/routes.js';
 import { createAuthStore } from './auth/store.js';
@@ -65,6 +66,7 @@ export async function buildApp(
     prefix: '/api',
     store: authStore,
     limiter: new LoginRateLimiter(),
+    oidc: config.oidc ? createOidc(config.oidc, authStore) : null,
   });
   await app.register(apiRoutes, { prefix: '/api', repo, events, monitor });
 

@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { loadOidcConfig, type OidcConfig } from './auth/oidc.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
@@ -21,6 +22,8 @@ export interface AppConfig {
   statusIntervalSeconds: number;
   statusTimeoutMs: number;
   logLevel: string;
+  /** null = Anmeldung nur lokal */
+  oidc: OidcConfig | null;
 }
 
 export function loadConfig(): AppConfig {
@@ -36,5 +39,6 @@ export function loadConfig(): AppConfig {
     statusIntervalSeconds: intFromEnv('STATUS_INTERVAL_SECONDS', 60),
     statusTimeoutMs: intFromEnv('STATUS_TIMEOUT_MS', 5000),
     logLevel: process.env.LOG_LEVEL ?? 'info',
+    oidc: loadOidcConfig(),
   };
 }

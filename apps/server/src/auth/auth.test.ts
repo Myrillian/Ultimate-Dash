@@ -14,6 +14,7 @@ const config: AppConfig = {
   statusIntervalSeconds: 60,
   statusTimeoutMs: 1000,
   logLevel: 'silent',
+  oidc: null,
 };
 
 const PASSWORD = 'ein-langes-passwort';
@@ -66,7 +67,7 @@ describe('Passwort-Hashing', () => {
 describe('Ersteinrichtung', () => {
   it('meldet zuerst, dass eine Einrichtung nötig ist', async () => {
     const res = await call({ method: 'GET', url: '/api/auth/status' });
-    expect(JSON.parse(res.body)).toEqual({ setupRequired: true, user: null });
+    expect(JSON.parse(res.body)).toEqual({ setupRequired: true, user: null, oidc: null });
   });
 
   it('legt den ersten Admin an, meldet ihn an und speichert den Namen klein', async () => {

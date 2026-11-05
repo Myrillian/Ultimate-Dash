@@ -45,10 +45,32 @@ export interface User {
   role: Role;
   createdAt: string;
   lastLoginAt: string | null;
+  /** Hat ein lokales Passwort. */
+  hasPassword: boolean;
+  /** Ist mit einer OIDC-Identität verknüpft. */
+  oidc: boolean;
 }
 
 export interface AuthStatus {
   /** true, solange noch kein Benutzer existiert. */
   setupRequired: boolean;
   user: User | null;
+  /** Gesetzt, wenn die Anmeldung über OIDC eingerichtet ist. */
+  oidc: {
+    label: string;
+    /** Rollen von SSO-Benutzern kommen bei jeder Anmeldung aus den Gruppen des Anbieters. */
+    rolesFromGroups: boolean;
+  } | null;
 }
+
+/** Fehlercodes, mit denen der OIDC-Callback zurück zur Anmeldung leitet (`?login_error=`). */
+export const oidcErrorMessages = {
+  state:
+    'Die Anmeldung ist abgelaufen oder wurde in einem anderen Tab gestartet. Bitte erneut versuchen.',
+  provider: 'Der Anmeldedienst hat die Anmeldung abgelehnt.',
+  unavailable: 'Der Anmeldedienst ist nicht erreichbar.',
+  forbidden: 'Dein Konto hat keinen Zugriff auf dieses Dashboard.',
+  unknown_user: 'Für dieses Konto gibt es hier keinen Benutzer. Ein Administrator muss es anlegen.',
+  setup: 'Lege zuerst das lokale Administrator-Konto an.',
+} as const;
+export type OidcErrorCode = keyof typeof oidcErrorMessages;
