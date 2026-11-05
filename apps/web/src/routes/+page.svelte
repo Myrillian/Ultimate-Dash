@@ -1,0 +1,347 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import type { Group, GroupInput, Service, ServiceInput } from '@ultimate-dash/shared';
+  import { api, ApiError } from '$lib/api';
+  import { dashboard } from '$lib/dashboard.svelte';
+  import { searchServices } from '$lib/search';
+  import { theme } from '$lib/theme.svelte';
+  import { toasts } from '$lib/toasts.svelte';
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import GroupForm from '$lib/components/GroupForm.svelte';
+  import GroupSection from '$lib/components/GroupSection.svelte';
+  import SearchBar from '$lib/components/SearchBar.svelte';
+  import ServiceCard from '$lib/components/ServiceCard.svelte';
+  import ServiceForm from '$lib/components/ServiceForm.svelte';
+  import UiIcon from '$lib/components/UiIcon.svelte';
+
+  let query = $state('');
+  let activeIndex = $state(0);
+  let searchInput: HTMLInputElement | undefined = $state();
+  let editMode = $state(false);
+
+  // Dialog-Zustände
+  let serviceDialog = $state<{ open: boolean; service: Service | null; groupId: number | null }>({
+    open: false,
+    service: null,
+    groupId: null,
+  });
+  let groupDialog = $state<{ open: boolean; group: Group | null }>({ open: false, group: null });
+  let confirm = $state<{
+    open: boolean;
+    title: string;
+    message: string;
+    action: () => Promise<void>;
+  }>({
+    open: false,
+    title: '',
+    message: '',
+    action: async () => {},
+  });
+
+  const groups = $derived(dashboard.data?.groups ?? []);
+  const hits = $derived(searchServices(groups, query));
+  const searching = $derived(query.trim().length > 0);
+
+  $effect(() => {
+    document.title = dashboard.data?.title ?? 'Ultimate Dash';
+  });
+  $effect(() => {
+    void query;
+    activeIndex = 0;
+  });
+
+  onMount(() => {
+    void dashboard.load();
+    dashboard.connect();
+    return () => dashboard.disconnect();
+  });
+
+  function openService(service: Service, newTab = false) {
+    const target = newTab ? '_blank' : service.target;
+    if (target === '_blank') window.open(service.url, '_blank', 'noopener,noreferrer');
+    else window.location.href = service.url;
+  }
+
+  function onSearchKeydown(event: KeyboardEvent) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      activeIndex = Math.min(activeIndex + 1, hits.length - 1);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      activeIndex = Math.max(activeIndex - 1, 0);
+    } else if (event.key === 'Enter') {
+      const hit = hits[activeIndex];
+      if (hit) {
+        event.preventDefault();
+        openService(hit.service, event.ctrlKey || event.metaKey);
+      }
+    } else if (event.key === 'Escape') {
+      query = '';
+      searchInput?.blur();
+    }
+  }
+
+  /** Einfach lostippen: Tastendruck außerhalb von Eingabefeldern startet die Suche. */
+  function onGlobalKeydown(event: KeyboardEvent) {
+    const target = event.target as HTMLElement | null;
+    const typing = !!target?.closest('input, textarea, select, [contenteditable="true"], dialog');
+    if (typing || event.altKey) return;
+    if ((event.key === 'k' && (event.ctrlKey || event.metaKey)) || event.key === '/') {
+      event.preventDefault();
+      searchInput?.focus();
+      return;
+    }
+    if (!event.ctrlKey && !event.metaKey && event.key.length === 1 && /\S/.test(event.key)) {
+      searchInput?.focus();
+      // Das Zeichen landet durch den Fokuswechsel automatisch im Feld.
+    }
+  }
+
+  async function run(action: () => Promise<unknown>, success: string) {
+    try {
+      await action();
+      toasts.show(success);
+      await dashboard.load();
+    } catch (error) {
+      // Feldfehler zeigt das Formular selbst an.
+      if (!(error instanceof ApiError && error.issues.length > 0)) {
+        toasts.show(error instanceof Error ? error.message : 'Aktion fehlgeschlagen', 'error');
+      }
+      throw error;
+    }
+  }
+
+  async function saveService(input: ServiceInput) {
+    const current = serviceDialog.service;
+    await run(
+      () => (current ? api.updateService(current.id, input) : api.createService(input)),
+      current ? 'Service gespeichert' : 'Service hinzugefügt',
+    );
+    serviceDialog.open = false;
+  }
+
+  async function saveGroup(input: GroupInput) {
+    const current = groupDialog.group;
+    await run(
+      () => (current ? api.updateGroup(current.id, input) : api.createGroup(input)),
+      current ? 'Gruppe gespeichert' : 'Gruppe angelegt',
+    );
+    groupDialog.open = false;
+  }
+
+  function askDelete(title: string, message: string, action: () => Promise<void>) {
+    confirm = {
+      open: true,
+      title,
+      message,
+      action: async () => {
+        await run(action, 'Gelöscht').catch(() => undefined);
+        confirm.open = false;
+      },
+    };
+  }
+
+  function moveItem<T extends { id: number }>(items: T[], id: number, direction: -1 | 1): number[] {
+    const ids = items.map((item) => item.id);
+    const index = ids.indexOf(id);
+    const swap = index + direction;
+    if (index < 0 || swap < 0 || swap >= ids.length) return ids;
+    [ids[index], ids[swap]] = [ids[swap]!, ids[index]!];
+    return ids;
+  }
+</script>
+
+<svelte:window onkeydown={onGlobalKeydown} />
+
+<div class="mx-auto flex min-h-dvh max-w-[1600px] flex-col gap-8 px-4 py-6 sm:px-6 lg:px-10">
+  <header class="flex flex-wrap items-center gap-3">
+    <div class="flex items-center gap-2.5">
+      <img src="/favicon.svg" alt="" width="32" height="32" />
+      <h1 class="text-xl font-semibold tracking-tight">
+        {dashboard.data?.title ?? 'Ultimate Dash'}
+      </h1>
+    </div>
+
+    <div class="order-last flex w-full justify-center sm:order-none sm:flex-1">
+      <SearchBar
+        bind:value={query}
+        bind:input={searchInput}
+        resultCount={hits.length}
+        onkeydown={onSearchKeydown}
+      />
+    </div>
+
+    <div class="ml-auto flex items-center gap-1 sm:ml-0">
+      <span
+        class="mr-1 size-2 rounded-full"
+        class:bg-up={dashboard.connection === 'live'}
+        class:bg-unknown={dashboard.connection === 'connecting'}
+        class:bg-down={dashboard.connection === 'offline'}
+        title={dashboard.connection === 'live'
+          ? 'Live-Verbindung aktiv'
+          : dashboard.connection === 'connecting'
+            ? 'Verbinde …'
+            : 'Keine Verbindung zum Server'}
+      ></span>
+      <button
+        type="button"
+        class="icon-btn"
+        onclick={() => theme.toggle()}
+        aria-label={theme.current === 'dark' ? 'Helles Design' : 'Dunkles Design'}
+      >
+        <UiIcon name={theme.current === 'dark' ? 'sun' : 'moon'} />
+      </button>
+      <button
+        type="button"
+        class="btn"
+        class:btn-primary={editMode}
+        aria-pressed={editMode}
+        onclick={() => (editMode = !editMode)}
+      >
+        <UiIcon name={editMode ? 'check' : 'pencil'} size={16} />
+        {editMode ? 'Fertig' : 'Bearbeiten'}
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1">
+    {#if dashboard.error && !dashboard.data}
+      <div
+        class="mx-auto max-w-md rounded-2xl border border-down/40 bg-elevated p-6 text-center"
+        role="alert"
+      >
+        <p class="font-medium">Das Dashboard konnte nicht geladen werden.</p>
+        <p class="mt-1 text-sm text-fg-muted">{dashboard.error}</p>
+        <button type="button" class="btn mt-4" onclick={() => dashboard.load()}
+          >Erneut versuchen</button
+        >
+      </div>
+    {:else if !dashboard.data}
+      <div class="grid gap-6 sm:grid-cols-2 xl:grid-cols-4" aria-busy="true" aria-label="Lädt">
+        {#each Array(4) as _, i (i)}
+          <div class="grid gap-2">
+            <div class="h-4 w-32 animate-pulse rounded bg-muted"></div>
+            {#each Array(3) as __, j (j)}
+              <div class="h-16 animate-pulse rounded-xl bg-muted"></div>
+            {/each}
+          </div>
+        {/each}
+      </div>
+    {:else if searching}
+      <section id="search-results" aria-label="Suchergebnisse" class="mx-auto grid max-w-xl gap-2">
+        {#each hits as hit, index (hit.service.id)}
+          <div>
+            <p class="mb-1 text-[11px] tracking-wide text-fg-muted uppercase">{hit.groupName}</p>
+            <ServiceCard
+              service={hit.service}
+              status={dashboard.statuses[hit.service.id]}
+              active={index === activeIndex}
+            />
+          </div>
+        {:else}
+          <p class="py-10 text-center text-fg-muted">Keine Services gefunden für „{query}“.</p>
+        {/each}
+        {#if hits.length > 0}
+          <p class="mt-2 text-center text-xs text-fg-muted">
+            <kbd>↑</kbd> <kbd>↓</kbd> auswählen · <kbd>Enter</kbd> öffnen · <kbd>Strg</kbd>+<kbd
+              >Enter</kbd
+            >
+            in neuem Tab ·
+            <kbd>Esc</kbd> schließen
+          </p>
+        {/if}
+      </section>
+    {:else if groups.length === 0}
+      <div class="mx-auto flex max-w-md flex-col items-center gap-3 py-20 text-center">
+        <span class="grid size-14 place-items-center rounded-2xl bg-muted text-accent"
+          ><UiIcon name="layout" size={28} /></span
+        >
+        <h2 class="text-lg font-semibold">Willkommen bei Ultimate Dash</h2>
+        <p class="text-fg-muted">
+          Lege eine erste Gruppe an, zum Beispiel „Infrastruktur“, und füge dann deine Services
+          hinzu.
+        </p>
+        <button
+          type="button"
+          class="btn btn-primary mt-2"
+          onclick={() => {
+            editMode = true;
+            groupDialog = { open: true, group: null };
+          }}
+        >
+          <UiIcon name="plus" size={16} /> Erste Gruppe anlegen
+        </button>
+      </div>
+    {:else}
+      <div class="grid gap-x-6 gap-y-8 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        {#each groups as group, index (group.id)}
+          <GroupSection
+            {group}
+            statuses={dashboard.statuses}
+            {editMode}
+            isFirst={index === 0}
+            isLast={index === groups.length - 1}
+            onaddservice={() => (serviceDialog = { open: true, service: null, groupId: group.id })}
+            oneditgroup={() => (groupDialog = { open: true, group })}
+            ondeletegroup={() =>
+              askDelete(
+                'Gruppe löschen?',
+                group.services.length > 0
+                  ? `„${group.name}“ und ihre ${group.services.length} Services werden gelöscht.`
+                  : `„${group.name}“ wird gelöscht.`,
+                () => api.deleteGroup(group.id),
+              )}
+            onmovegroup={(direction) =>
+              void run(
+                () => api.reorderGroups(moveItem(groups, group.id, direction)),
+                'Reihenfolge gespeichert',
+              ).catch(() => undefined)}
+            oneditservice={(service) =>
+              (serviceDialog = { open: true, service, groupId: service.groupId })}
+            ondeleteservice={(service) =>
+              askDelete('Service löschen?', `„${service.name}“ wird gelöscht.`, () =>
+                api.deleteService(service.id),
+              )}
+            onmoveservice={(service, direction) =>
+              void run(
+                () =>
+                  api.arrangeServices(group.id, moveItem(group.services, service.id, direction)),
+                'Reihenfolge gespeichert',
+              ).catch(() => undefined)}
+          />
+        {/each}
+        {#if editMode}
+          <button
+            type="button"
+            class="flex min-h-32 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line text-fg-muted transition hover:border-accent hover:text-accent"
+            onclick={() => (groupDialog = { open: true, group: null })}
+          >
+            <UiIcon name="plus" size={22} /> Gruppe hinzufügen
+          </button>
+        {/if}
+      </div>
+    {/if}
+  </main>
+</div>
+
+<ServiceForm
+  open={serviceDialog.open}
+  {groups}
+  service={serviceDialog.service}
+  defaultGroupId={serviceDialog.groupId}
+  onclose={() => (serviceDialog.open = false)}
+  onsubmit={saveService}
+/>
+<GroupForm
+  open={groupDialog.open}
+  group={groupDialog.group}
+  onclose={() => (groupDialog.open = false)}
+  onsubmit={saveGroup}
+/>
+<ConfirmDialog
+  open={confirm.open}
+  title={confirm.title}
+  message={confirm.message}
+  onclose={() => (confirm.open = false)}
+  onconfirm={confirm.action}
+/>
