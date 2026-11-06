@@ -1,7 +1,12 @@
 import { eq } from 'drizzle-orm';
 import type {
   BlockingAction,
+  DnsRecordCreate,
+  DnsRecordDelete,
+  DnsRecordList,
+  DnsRecordUpdate,
   DnsSummary,
+  DnsZone,
   DnsTopEntry,
   StatsRange,
   TechnitiumSettings,
@@ -9,11 +14,26 @@ import type {
   TechnitiumTestResult,
   User,
 } from '@ultimate-dash/shared';
-import { technitiumSettingsInput } from '@ultimate-dash/shared';
+import {
+  dnsRecordCreate,
+  dnsRecordDelete,
+  dnsRecordUpdate,
+  technitiumSettingsInput,
+} from '@ultimate-dash/shared';
 import type { AuditLog } from '../db/audit.js';
 import type { Db } from '../db/client.js';
 import { settings } from '../db/schema.js';
 import { callTechnitium, TechnitiumError, type TechnitiumConnection } from './client.js';
+import {
+  deleteParams,
+  describeRecord,
+  newValueParams,
+  toRecord,
+  toZone,
+  valueParams,
+  type RawRecord,
+  type RawZone,
+} from './records.js';
 
 const SETTINGS_KEY = 'technitium';
 /** So lange gelten abgerufene Statistiken; mehrere offene Dashboards teilen sich einen Abruf. */
@@ -280,5 +300,127 @@ export class TechnitiumService {
     } finally {
       this.cache.clear();
     }
+  }
+  async zones(): Promise<DnsZone[]> {
+    const result = await this.call<{ zones: RawZone[] }>('zones/list');
+    // Eigene Zonen zuerst, dann Reverse-Zonen, Technitium-interne zuletzt.
+    const rank = (zone: DnsZone) => (zone.internal ? 2 : zone.name.endsWith('.arpa') ? 1 : 0);
+    return result.zones
+      .map(toZone)
+      .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+  }
+
+  async records(zone: string): Promise<DnsRecordList> {
+    const result = await this.call<{ zone: RawZone; records: RawRecord[] }>('zones/records/get', {
+      domain: zone,
+      zone,
+      listZone: true,
+    });
+    return {
+      zone: toZone(result.zone),
+      // SOA und DNSSEC-Verwaltungseinträge sind für den Alltag nur Rauschen.
+      records: result.records
+        .filter(
+          (record) =>
+            !['SOA', 'RRSIG', 'DNSKEY', 'NSEC', 'NSEC3', 'NSEC3PARAM', 'DS'].includes(record.type),
+        )
+        .map(toRecord),
+    };
+  }
+
+  /** Führt eine Änderung aus und protokolliert sie, auch wenn sie fehlschlägt. */
+  private async audited<T>(
+    user: User,
+    action: string,
+    target: string,
+    details: Record<string, unknown>,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      const result = await run();
+      this.options.audit.record({ user, action, target, details, ok: true });
+      return result;
+    } catch (error) {
+      this.options.audit.record({
+        user,
+        action,
+        target,
+        details,
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  async addRecord(raw: DnsRecordCreate, user: User): Promise<void> {
+    const input = dnsRecordCreate.parse(raw);
+    const hasPtr = input.data.type === 'A' || input.data.type === 'AAAA';
+    await this.audited(
+      user,
+      'technitium.record.add',
+      describeRecord(input.domain, input.data),
+      { zone: input.zone, ttl: input.ttl },
+      () =>
+        this.call('zones/records/add', {
+          zone: input.zone,
+          domain: input.domain,
+          type: input.data.type,
+          ttl: input.ttl,
+          ...(input.comments ? { comments: input.comments } : {}),
+          ...(hasPtr && input.createPtr ? { ptr: true, createPtrZone: true } : {}),
+          ...valueParams(input.data),
+        }),
+    );
+  }
+
+  async updateRecord(raw: DnsRecordUpdate, user: User): Promise<void> {
+    const input = dnsRecordUpdate.parse(raw);
+    if (input.current.data.type !== input.data.type)
+      throw new TechnitiumError('Der Typ eines Eintrags lässt sich nicht ändern', 'api');
+    const hasPtr = input.data.type === 'A' || input.data.type === 'AAAA';
+    await this.audited(
+      user,
+      'technitium.record.update',
+      describeRecord(input.current.domain, input.current.data),
+      {
+        zone: input.zone,
+        to: describeRecord(input.domain, input.data),
+        ttl: input.ttl,
+        disabled: input.disabled,
+      },
+      () =>
+        this.call('zones/records/update', {
+          zone: input.zone,
+          domain: input.current.domain,
+          type: input.data.type,
+          ...(input.domain !== input.current.domain ? { newDomain: input.domain } : {}),
+          ttl: input.ttl,
+          disable: input.disabled,
+          comments: input.comments ?? '',
+          ...(hasPtr && input.createPtr ? { ptr: true, createPtrZone: true } : {}),
+          ...valueParams(input.current.data),
+          ...newValueParams(input.data),
+          // CNAME kennt kein „neu“: der Wert wird direkt gesetzt.
+          ...(input.data.type === 'CNAME' ? { cname: input.data.cname } : {}),
+        }),
+    );
+  }
+
+  async deleteRecord(raw: DnsRecordDelete, user: User): Promise<void> {
+    const input = dnsRecordDelete.parse(raw);
+    await this.audited(
+      user,
+      'technitium.record.delete',
+      describeRecord(input.domain, input.data),
+      { zone: input.zone },
+      () =>
+        this.call('zones/records/delete', {
+          zone: input.zone,
+          domain: input.domain,
+          type: input.data.type,
+          ...deleteParams(input.data),
+        }),
+    );
   }
 }

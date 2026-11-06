@@ -156,4 +156,8 @@ Ist Technitium verbunden, zeigt das Dashboard oben einen DNS-Bereich: Anfragen, 
 
 Das Token bleibt auf dem Server (in der SQLite-Datei) und wird nie an den Browser geschickt. Alle Anfragen an Technitium laufen über das Backend. Wer die Verbindung lieber fest vorgibt, setzt `TECHNITIUM_URL` und `TECHNITIUM_TOKEN` (optional `TECHNITIUM_TLS_INSECURE=true` bei selbst signiertem Zertifikat); dann ist sie in der Oberfläche nur lesbar.
 
+### Zonen und Records
+
+Über „Zonen und Records ›“ im DNS-Bereich (oder `/dns`) lassen sich alle Zonen und ihre Einträge ansehen, durchsuchen und nach Typ filtern. Namen erscheinen relativ zur Zone (`nas` statt `nas.home.lan`, `@` für die Zone selbst). Admins können Einträge der Typen A, AAAA, CNAME, PTR, MX, TXT, NS und SRV anlegen, ändern (auch umbenennen, TTL, Kommentar, deaktivieren) und löschen. Andere Typen werden nur angezeigt. Bei A und AAAA lässt sich der passende PTR-Eintrag gleich mit anlegen; fehlt die Reverse-Zone, erstellt Technitium sie dabei. Interne Zonen von Technitium sind schreibgeschützt. Das API-Token braucht dafür die Zonen-Rechte _View_ und _Modify_ beziehungsweise _Delete_. Jede Änderung steht im Änderungsprotokoll.
+
 Zum Ausprobieren ohne echten Server gibt es eine Simulation: `pnpm --filter @ultimate-dash/server fake:technitium` startet sie auf Port 5380 mit dem Token `dev-token`.

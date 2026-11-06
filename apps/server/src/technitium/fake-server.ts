@@ -13,11 +13,137 @@ export interface FakeTechnitium {
     temporaryDisableBlockingTill: string | null;
     listUpdates: number;
   };
+  /** Records je Zone; Tests dürfen sie lesen und verändern */
+  records: Record<string, FakeRecord[]>;
   requests: { path: string; params: Record<string, string>; authorization?: string }[];
   /** Erlaubte Pfade für das Token; null = alles erlaubt */
   allowedPaths: Set<string> | null;
   close(): Promise<void>;
 }
+
+export interface FakeRecord {
+  name: string;
+  type: string;
+  ttl: number;
+  disabled: boolean;
+  comments?: string;
+  rData: Record<string, string | number>;
+}
+
+const ZONES = [
+  { name: 'home.lan', type: 'Primary', internal: false },
+  { name: '10.10.10.in-addr.arpa', type: 'Primary', internal: false },
+  { name: 'localhost', type: 'Primary', internal: true },
+];
+
+const seedRecords = (): Record<string, FakeRecord[]> => ({
+  'home.lan': [
+    {
+      name: 'home.lan',
+      type: 'SOA',
+      ttl: 3600,
+      disabled: false,
+      rData: { primaryNameServer: 'dns.home.lan', serial: 1 },
+    },
+    {
+      name: 'home.lan',
+      type: 'NS',
+      ttl: 3600,
+      disabled: false,
+      rData: { nameServer: 'dns.home.lan' },
+    },
+    {
+      name: 'nas.home.lan',
+      type: 'A',
+      ttl: 3600,
+      disabled: false,
+      comments: 'Synology',
+      rData: { ipAddress: '10.10.10.20' },
+    },
+    {
+      name: 'pve.home.lan',
+      type: 'A',
+      ttl: 300,
+      disabled: false,
+      rData: { ipAddress: '10.10.10.10' },
+    },
+    {
+      name: 'pve.home.lan',
+      type: 'AAAA',
+      ttl: 300,
+      disabled: false,
+      rData: { ipAddress: 'fd00::10' },
+    },
+    {
+      name: 'wiki.home.lan',
+      type: 'CNAME',
+      ttl: 3600,
+      disabled: false,
+      rData: { cname: 'nas.home.lan' },
+    },
+    {
+      name: 'home.lan',
+      type: 'MX',
+      ttl: 3600,
+      disabled: false,
+      rData: { preference: 10, exchange: 'mail.home.lan' },
+    },
+    {
+      name: 'home.lan',
+      type: 'TXT',
+      ttl: 3600,
+      disabled: false,
+      rData: { text: 'v=spf1 -all', splitText: 'false' },
+    },
+    {
+      name: '_sip._tcp.home.lan',
+      type: 'SRV',
+      ttl: 3600,
+      disabled: false,
+      rData: { priority: 1, weight: 5, port: 5060, target: 'pbx.home.lan' },
+    },
+    {
+      name: 'app.home.lan',
+      type: 'ANAME',
+      ttl: 3600,
+      disabled: false,
+      rData: { dname: 'nas.home.lan' },
+    },
+  ],
+  '10.10.10.in-addr.arpa': [
+    {
+      name: '10.10.10.10.in-addr.arpa',
+      type: 'PTR',
+      ttl: 300,
+      disabled: false,
+      rData: { ptrName: 'pve.home.lan' },
+    },
+  ],
+  localhost: [],
+});
+
+const sameValue = (
+  record: FakeRecord,
+  params: Record<string, string>,
+  keys: string[],
+  prefix = '',
+) =>
+  keys.every(
+    (key) =>
+      String(record.rData[key]) ===
+      params[prefix ? prefix + key[0]!.toUpperCase() + key.slice(1) : key],
+  );
+
+const VALUE_KEYS: Record<string, string[]> = {
+  A: ['ipAddress'],
+  AAAA: ['ipAddress'],
+  CNAME: [],
+  PTR: ['ptrName'],
+  MX: ['preference', 'exchange'],
+  TXT: ['text'],
+  NS: ['nameServer'],
+  SRV: ['priority', 'weight', 'port', 'target'],
+};
 
 function minuteLabels(count: number): string[] {
   const now = Math.floor(Date.now() / 60_000) * 60_000;
@@ -93,6 +219,7 @@ export async function startFakeTechnitium(port = 0, token = 'test-token'): Promi
     state: { enableBlocking: true, temporaryDisableBlockingTill: null, listUpdates: 0 },
     requests: [],
     allowedPaths: null,
+    records: seedRecords(),
   };
   let timer: NodeJS.Timeout | undefined;
 
@@ -159,6 +286,100 @@ export async function startFakeTechnitium(port = 0, token = 'test-token'): Promi
         case 'settings/forceUpdateBlockLists':
           s.listUpdates++;
           return send({ status: 'ok' });
+        case 'zones/list':
+          return send({
+            status: 'ok',
+            response: {
+              zones: ZONES.map((z) => ({ ...z, dnssecStatus: 'Unsigned', disabled: false })),
+            },
+          });
+        case 'zones/records/get': {
+          const zone = ZONES.find((z) => z.name === params.zone);
+          if (!zone)
+            return send({
+              status: 'error',
+              errorMessage: `No such zone was found: ${params.zone}`,
+            });
+          return send({
+            status: 'ok',
+            response: {
+              zone: { ...zone, disabled: false },
+              records: fake.records[zone.name] ?? [],
+            },
+          });
+        }
+        case 'zones/records/add': {
+          const list = fake.records[params.zone!];
+          if (!list)
+            return send({
+              status: 'error',
+              errorMessage: `No such zone was found: ${params.zone}`,
+            });
+          const keys = VALUE_KEYS[params.type!] ?? [];
+          const rData = Object.fromEntries(
+            keys.map((k) => [
+              k,
+              /^\d+$/.test(params[k]!) && k !== 'text' ? Number(params[k]) : params[k]!,
+            ]),
+          );
+          if (params.type === 'CNAME') rData.cname = params.cname!;
+          if (
+            list.some(
+              (r) =>
+                r.name === params.domain && r.type === params.type && sameValue(r, params, keys),
+            )
+          )
+            return send({
+              status: 'error',
+              errorMessage: 'Cannot add record: record already exists.',
+            });
+          list.push({
+            name: params.domain!,
+            type: params.type!,
+            ttl: Number(params.ttl ?? 3600),
+            disabled: false,
+            ...(params.comments ? { comments: params.comments } : {}),
+            rData,
+          });
+          return send({ status: 'ok', response: {} });
+        }
+        case 'zones/records/update': {
+          const list = fake.records[params.zone!] ?? [];
+          const keys = VALUE_KEYS[params.type!] ?? [];
+          const record = list.find(
+            (r) => r.name === params.domain && r.type === params.type && sameValue(r, params, keys),
+          );
+          if (!record)
+            return send({
+              status: 'error',
+              errorMessage: 'Cannot update record: record does not exist.',
+            });
+          for (const key of keys) {
+            const next = params['new' + key[0]!.toUpperCase() + key.slice(1)];
+            if (next !== undefined)
+              record.rData[key] = /^\d+$/.test(next) && key !== 'text' ? Number(next) : next;
+          }
+          if (params.type === 'CNAME') record.rData.cname = params.cname!;
+          if (params.newDomain) record.name = params.newDomain;
+          record.ttl = Number(params.ttl ?? record.ttl);
+          record.disabled = params.disable === 'true';
+          record.comments = params.comments || undefined;
+          return send({ status: 'ok', response: {} });
+        }
+        case 'zones/records/delete': {
+          const list = fake.records[params.zone!] ?? [];
+          const keys = VALUE_KEYS[params.type!] ?? [];
+          const index = list.findIndex(
+            (r) => r.name === params.domain && r.type === params.type && sameValue(r, params, keys),
+          );
+          if (index < 0)
+            return send({
+              status: 'error',
+              errorMessage: 'Cannot delete record: record does not exist.',
+            });
+          list.splice(index, 1);
+          return send({ status: 'ok' });
+        }
         default:
           return send({ status: 'error', errorMessage: `Unbekannter Pfad ${path}` });
       }

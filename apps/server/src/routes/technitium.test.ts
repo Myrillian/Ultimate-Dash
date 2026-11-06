@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fileURLToPath } from 'node:url';
-import type { AuditEntry, DnsSummary, TechnitiumSettings } from '@ultimate-dash/shared';
+import type {
+  AuditEntry,
+  DnsRecordList,
+  DnsSummary,
+  DnsZone,
+  TechnitiumSettings,
+} from '@ultimate-dash/shared';
 import { buildApp } from '../app.js';
 import type { AppConfig } from '../config.js';
 import { startFakeTechnitium, type FakeTechnitium } from '../technitium/fake-server.js';
@@ -161,5 +167,163 @@ describe('Technitium-Verbindung', () => {
     expect(
       (await call('POST', '/api/technitium/blocking', { action: 'disable' }, viewer)).statusCode,
     ).toBe(403);
+  });
+});
+
+describe('DNS-Records', () => {
+  const zone = 'home.lan';
+  const list = async () =>
+    (await call('GET', `/api/technitium/records?zone=${zone}`)).json<DnsRecordList>();
+  const find = (records: DnsRecordList, domain: string, type: string) =>
+    records.records.find((r) => r.domain === domain && r.type === type);
+
+  it('listet Zonen: eigene, Reverse, interne und Records ohne SOA', async () => {
+    await connect();
+    const zones = (await call('GET', '/api/technitium/zones')).json<DnsZone[]>();
+    expect(zones.map((z) => z.name)).toEqual(['home.lan', '10.10.10.in-addr.arpa', 'localhost']);
+    expect(zones[2]!.internal).toBe(true);
+
+    const records = await list();
+    expect(records.zone.name).toBe('home.lan');
+    expect(records.records.some((r) => r.type === 'SOA')).toBe(false);
+    expect(find(records, 'nas.home.lan', 'A')).toMatchObject({
+      ttl: 3600,
+      display: '10.10.10.20',
+      comments: 'Synology',
+      data: { type: 'A', ipAddress: '10.10.10.20' },
+    });
+    expect(find(records, '_sip._tcp.home.lan', 'SRV')!.display).toBe('1 5 5060 pbx.home.lan');
+    // Unbekannte Typen werden angezeigt, aber nicht bearbeitbar
+    expect(find(records, 'app.home.lan', 'ANAME')).toMatchObject({
+      data: null,
+      display: 'nas.home.lan',
+    });
+  });
+
+  it('legt Records an und lehnt Duplikate und ungültige Werte ab', async () => {
+    await connect();
+    const body = {
+      zone,
+      domain: 'test.home.lan',
+      ttl: 600,
+      comments: 'Test',
+      data: { type: 'A', ipAddress: '10.10.10.99' },
+    };
+    expect((await call('POST', '/api/technitium/records', body)).statusCode).toBe(204);
+    expect(find(await list(), 'test.home.lan', 'A')).toMatchObject({ ttl: 600, comments: 'Test' });
+
+    const duplicate = await call('POST', '/api/technitium/records', body);
+    expect(duplicate.statusCode).toBe(502);
+    expect(duplicate.json().error).toMatch(/already exists/);
+
+    const invalid = await call('POST', '/api/technitium/records', {
+      ...body,
+      data: { type: 'A', ipAddress: 'nicht-ip' },
+    });
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json().issues[0].path).toEqual(['data', 'ipAddress']);
+  });
+
+  it('ändert Wert, Name, TTL und Status eines Records', async () => {
+    await connect();
+    const update = await call('PUT', '/api/technitium/records', {
+      zone,
+      domain: 'nas2.home.lan',
+      ttl: 120,
+      comments: null,
+      disabled: true,
+      data: { type: 'A', ipAddress: '10.10.10.21' },
+      current: { domain: 'nas.home.lan', data: { type: 'A', ipAddress: '10.10.10.20' } },
+    });
+    expect(update.statusCode).toBe(204);
+    const records = await list();
+    expect(find(records, 'nas.home.lan', 'A')).toBeUndefined();
+    expect(find(records, 'nas2.home.lan', 'A')).toMatchObject({
+      ttl: 120,
+      disabled: true,
+      comments: null,
+      display: '10.10.10.21',
+    });
+
+    // CNAME und MX haben eigene Parameternamen beim Ändern
+    await call('PUT', '/api/technitium/records', {
+      zone,
+      domain: 'wiki.home.lan',
+      ttl: 3600,
+      data: { type: 'CNAME', cname: 'pve.home.lan' },
+      current: { domain: 'wiki.home.lan', data: { type: 'CNAME', cname: 'nas.home.lan' } },
+    });
+    await call('PUT', '/api/technitium/records', {
+      zone,
+      domain: 'home.lan',
+      ttl: 3600,
+      data: { type: 'MX', preference: 20, exchange: 'mx2.home.lan' },
+      current: {
+        domain: 'home.lan',
+        data: { type: 'MX', preference: 10, exchange: 'mail.home.lan' },
+      },
+    });
+    const after = await list();
+    expect(find(after, 'wiki.home.lan', 'CNAME')!.display).toBe('pve.home.lan');
+    expect(find(after, 'home.lan', 'MX')!.display).toBe('20 mx2.home.lan');
+
+    const typeChange = await call('PUT', '/api/technitium/records', {
+      zone,
+      domain: 'pve.home.lan',
+      ttl: 300,
+      data: { type: 'CNAME', cname: 'x.home.lan' },
+      current: { domain: 'pve.home.lan', data: { type: 'A', ipAddress: '10.10.10.10' } },
+    });
+    expect(typeChange.statusCode).toBe(502);
+  });
+
+  it('löscht genau den gewählten Record und protokolliert alles', async () => {
+    await connect();
+    const del = (domain: string, data: object) =>
+      call('POST', '/api/technitium/records/delete', { zone, domain, data });
+    expect((await del('pve.home.lan', { type: 'A', ipAddress: '10.10.10.10' })).statusCode).toBe(
+      204,
+    );
+    const records = await list();
+    expect(find(records, 'pve.home.lan', 'A')).toBeUndefined();
+    expect(find(records, 'pve.home.lan', 'AAAA')).toBeDefined();
+
+    expect((await del('wiki.home.lan', { type: 'CNAME', cname: 'nas.home.lan' })).statusCode).toBe(
+      204,
+    );
+    expect(
+      (await del('gibt-es-nicht.home.lan', { type: 'A', ipAddress: '1.2.3.4' })).statusCode,
+    ).toBe(502);
+
+    const log = (await call('GET', '/api/audit')).json<AuditEntry[]>();
+    expect(log.slice(0, 3).map((e) => [e.action, e.ok, e.target])).toEqual([
+      ['technitium.record.delete', false, 'A gibt-es-nicht.home.lan → 1.2.3.4'],
+      ['technitium.record.delete', true, 'CNAME wiki.home.lan → nas.home.lan'],
+      ['technitium.record.delete', true, 'A pve.home.lan → 10.10.10.10'],
+    ]);
+  });
+
+  it('lässt Nur-lesen-Benutzer Records ansehen, aber nicht ändern', async () => {
+    await connect();
+    await call('POST', '/api/users', { username: 'gast', password: 'noch-ein-langes-pw' });
+    const login = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { username: 'gast', password: 'noch-ein-langes-pw' },
+    });
+    const viewer = String(login.headers['set-cookie']).split(';')[0]!;
+    expect(
+      (await call('GET', `/api/technitium/records?zone=${zone}`, undefined, viewer)).statusCode,
+    ).toBe(200);
+    const body = {
+      zone,
+      domain: 'x.home.lan',
+      ttl: 60,
+      data: { type: 'A', ipAddress: '10.0.0.1' },
+    };
+    expect((await call('POST', '/api/technitium/records', body, viewer)).statusCode).toBe(403);
+    expect((await call('POST', '/api/technitium/records/delete', body, viewer)).statusCode).toBe(
+      403,
+    );
   });
 });

@@ -197,6 +197,9 @@
         DNS
         {#if summary}<span class="font-normal text-fg-muted">· {summary.serverDomain}</span>{/if}
       </h2>
+      {#if summary}
+        <a href="/dns" class="text-xs text-accent hover:underline">Zonen und Records ›</a>
+      {/if}
 
       <div
         class="inline-flex rounded-lg border border-line bg-elevated p-0.5"
