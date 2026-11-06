@@ -49,7 +49,7 @@ Das IPAM speichert weiterhin nur das, was nirgends sonst existiert (Netze, Kateg
 
 ### Assistent „Neue IP“
 
-Aufruf: Klick auf einen freien Block, oder Schaltfläche „Neue IP“ in der Kopfzeile (dann mit Wahl von Netz und Kategorie).
+Aufruf: Klick auf einen freien Block, oder Schaltfläche „Neue IP“ in der Kopfzeile (dann mit Wahl von Netz und Kategorie). Der Assistent legt **immer genau eine IP** pro Vorgang an.
 
 1. **Wo:** Netz und Kategorie (falls nicht durch den Klick bekannt). Die angeklickte IP ist vorgeschlagen, sonst die erste freie IP des Bereichs; alternativ Auswahl aus einer Liste freier IPs oder eigene Eingabe.
 2. **Art:** Reservierung (braucht MAC und Scope) oder statisch (nur DNS und Notiz). Liegt eine statische IP im DHCP-Pool, steht dort eine Warnung, dass der Server sie vergeben könnte. Verboten ist es nicht.
@@ -69,7 +69,7 @@ Ein gemeinsamer Baukasten für IP-Liste, DNS-Einträge, DHCP-Leases und Reservie
 - **Filter als Chips**, kombinierbar (UND); Mehrfachauswahl innerhalb eines Filters (ODER).
 - **Sortierung** nach jeder Spalte, IP-Adressen numerisch.
 - **Spalten** ein- und ausblendbar, Auswahl wird gemerkt.
-- **Filter stehen in der URL**, damit Links und „zurück“ funktionieren. Häufige Filter lassen sich als **gespeicherte Ansicht** merken.
+- **Filter stehen in der URL**, damit Links und „zurück“ funktionieren. Häufige Filter lassen sich als **gespeicherte Ansicht** merken. Gespeicherte Ansichten (und gemerkte Spalten und Sortierung) gehören dem einzelnen Benutzer, die Daten dahinter sind für alle gleich.
 - Zähler „n von m“ und ein Knopf „Filter zurücksetzen“.
 
 Sinnvolle Attribute je Liste:
@@ -82,7 +82,7 @@ Sinnvolle Attribute je Liste:
 | **Reservierungen** | IP, Hostname, MAC, Scope, Kommentar, hat DNS-Eintrag |
 | **Protokoll** | Zeitraum, Benutzer, Aktion, Ziel, Ergebnis (erfolgreich oder fehlgeschlagen) |
 
-Möglich später: Hersteller zur MAC (OUI-Tabelle). Das braucht eine mitgelieferte Herstellerliste und ist kein Muss.
+**Hersteller aus der MAC:** Zu jeder MAC zeigt die Oberfläche den Hersteller (z. B. „Synology“, „Apple“), in IP-Liste, Seitenfenster, Leases und Reservierungen, und man kann danach suchen und filtern. Grundlage ist die öffentliche IEEE-OUI-Liste, die als Datei im Server mitgeliefert wird (kein Abruf zur Laufzeit). Zufällige, „private“ MAC-Adressen (moderne Handys) haben keinen Hersteller und werden als „Zufällige MAC“ gekennzeichnet.
 
 ## Navigation
 
@@ -100,8 +100,8 @@ DNS und DHCP bleiben erreichbar und behalten ihre Listen. Wer an einem Eintrag k
 - **Backend:** Neuer Endpunkt `GET /api/ipam/ips/:adresse` (und Liste mit Filtern) liefert den IP-Eintrag. Er nutzt die vorhandenen Dienste (DHCP, DNS-Records, Ping-Daten). Dazu ein Reverse-Index der DNS-Einträge (A auf IP, PTR, CNAMEs auf Namen), der wie die Belegung 15 Sekunden gecacht wird.
 - **Aktionen:** Ein Dienst „IP-Aktionen“ bündelt die Mehrschritt-Abläufe (Reservierung plus DNS plus PTR, Umwandeln, Umbenennen) mit Rücknahme bei Fehlern und einem Audit-Eintrag je Ablauf. Die Validierung liegt in `packages/shared`.
 - **Frontend:** Ein Seitenfenster-Baustein und ein Filter-Baustein, die in allen Listen gleich verwendet werden.
-- **Rechte:** Wie bisher: Ansehen für alle, Ändern nur für Admins.
-- **Nicht im Umfang:** Scopes oder Zonen anlegen und löschen, IPv6, Hintergrund-Synchronisation.
+- **Rechte:** IPAM, DHCP und DNS sind für alle Benutzer gleich und dieselben Daten. Ohne Admin-Rolle gibt es nur Leserechte: Das Seitenfenster zeigt alles, aber ohne Bearbeiten, Assistent, Scan-Knopf und Bestätigen. Das wird im Server erzwungen (wie bisher für alle schreibenden Aufrufe) und in der Oberfläche ausgeblendet. Technitium-Zugangsdaten bleiben nur für Admins sichtbar.
+- **Nicht im Umfang:** Scopes oder Zonen anlegen und löschen, IPv6, Hintergrund-Synchronisation, mehrere IPs auf einmal anlegen.
 
 ## Umsetzung in Schritten
 
@@ -114,8 +114,12 @@ DNS und DHCP bleiben erreichbar und behalten ihre Listen. Wer an einem Eintrag k
 
 Jeder Schritt ist ein eigener Pull Request und nach dem Merge benutzbar.
 
+## Entschieden am 06.11.2026
+
+- Hersteller aus der MAC wird angezeigt (mitgelieferte OUI-Liste).
+- Der Assistent legt nur eine IP pro Vorgang an.
+- Ansichten sind pro Benutzer, die IPAM-, DHCP- und DNS-Daten für alle gleich. Ohne Admin-Rolle nur Leserechte.
+
 ## Offene Punkte
 
-- Hersteller aus der MAC anzeigen (OUI-Liste)?
-- Soll „Neue IP“ auch mehrere IPs auf einmal anlegen können (z. B. Import aus einer Liste)?
-- Gespeicherte Ansichten pro Benutzer oder für alle?
+- **Dashboard pro Benutzer:** Gruppen und Dienste des Dashboards sind heute für alle gleich. Eine eigene Dashboard-Ansicht je Benutzer wäre eine eigene Änderung (Datenmodell und Oberfläche) und gehört nicht zu dieser Konzeptseite. Soll sie als eigener Punkt in die Planung?
