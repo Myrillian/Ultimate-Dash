@@ -25,6 +25,15 @@ const PUBLIC_ROUTES = new Set([
 /** Schreibende Aufrufe, die auch „Nur lesen“-Benutzer für sich selbst machen dürfen. */
 const SELF_SERVICE_ROUTES = new Set(['POST /api/auth/logout', 'POST /api/auth/password']);
 
+/**
+ * Das Dashboard gehört jedem Benutzer selbst (Gruppen, Services, Import, Kopieren);
+ * die Routen arbeiten ausschließlich auf den Daten des angemeldeten Benutzers.
+ */
+const isOwnDashboardRoute = (route: string) =>
+  /^(POST|PUT|DELETE) \/api\/(groups|services)(\/|$)/.test(route) ||
+  route === 'POST /api/dashboard/copy' ||
+  route === 'POST /api/config/import';
+
 const isWrite = (method: string) => !['GET', 'HEAD', 'OPTIONS'].includes(method);
 
 export function setSessionCookie(request: FastifyRequest, reply: FastifyReply, token: string) {
@@ -45,7 +54,7 @@ export function clearSessionCookie(reply: FastifyReply) {
 /**
  * Prüft für alle /api-Routen Session, Rolle und Herkunft:
  * - ohne gültige Session → 401
- * - schreibende Aufrufe nur für Admins → sonst 403
+ * - schreibende Aufrufe nur für Admins (außer am eigenen Dashboard) → sonst 403
  * - schreibende Aufrufe von fremden Origins → 403 (CSRF-Schutz zusätzlich zu SameSite)
  */
 export function registerAuthGuard(app: FastifyInstance, store: AuthStore) {
@@ -77,6 +86,7 @@ export function registerAuthGuard(app: FastifyInstance, store: AuthStore) {
     if (
       isWrite(request.method) &&
       !SELF_SERVICE_ROUTES.has(route) &&
+      !isOwnDashboardRoute(route) &&
       request.user.role !== 'admin'
     ) {
       return reply.code(403).send({ error: 'Dafür sind Admin-Rechte nötig' });

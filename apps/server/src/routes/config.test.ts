@@ -145,7 +145,7 @@ groups:
     expect((await dashboard()).groups).toHaveLength(0);
   });
 
-  it('erlaubt Export und Import nur Admins', async () => {
+  it('erlaubt Export und Import auch Nur-lesen-Benutzern, aber nur für das eigene Dashboard', async () => {
     await call('POST', '/api/users', { username: 'gast', password: 'noch-ein-langes-pw' });
     const login = await ctx.app.inject({
       method: 'POST',
@@ -153,10 +153,13 @@ groups:
       payload: { username: 'gast', password: 'noch-ein-langes-pw' },
     });
     const viewer = String(login.headers['set-cookie']).split(';')[0]!;
-    expect((await call('GET', '/api/config/export', undefined, viewer)).statusCode).toBe(403);
     expect(
       (await call('POST', '/api/config/import', { yaml: SAMPLE, mode: 'merge' }, viewer))
         .statusCode,
-    ).toBe(403);
+    ).toBe(200);
+    const exported = parse((await call('GET', '/api/config/export', undefined, viewer)).body);
+    expect(exported.groups[0].name).toBe('Infrastruktur');
+    // Das Dashboard des Admins bleibt unberührt.
+    expect((await dashboard()).groups).toHaveLength(0);
   });
 });

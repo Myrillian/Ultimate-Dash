@@ -208,7 +208,7 @@ describe('Rollen und Benutzerverwaltung', () => {
     return { user, cookie: cookieOf(login) };
   }
 
-  it('erlaubt „Nur lesen“-Benutzern Lesen, aber kein Schreiben', async () => {
+  it('erlaubt „Nur lesen“-Benutzern das eigene Dashboard, aber keine Verwaltung', async () => {
     const admin = await setupAdmin();
     const viewer = await createViewer(admin);
     expect(viewer.user.role).toBe('viewer');
@@ -222,6 +222,16 @@ describe('Rollen und Benutzerverwaltung', () => {
           url: '/api/groups',
           cookie: viewer.cookie,
           payload: { name: 'X' },
+        })
+      ).statusCode,
+    ).toBe(201);
+    expect(
+      (
+        await call({
+          method: 'POST',
+          url: '/api/ipam/categories',
+          cookie: viewer.cookie,
+          payload: { name: 'X', color: 'blue' },
         })
       ).statusCode,
     ).toBe(403);

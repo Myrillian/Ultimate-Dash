@@ -10,14 +10,20 @@ const timestamps = {
     .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 };
 
-export const groups = sqliteTable('groups', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  name: text('name').notNull(),
-  icon: text('icon'),
-  collapsed: integer('collapsed', { mode: 'boolean' }).notNull().default(false),
-  sortOrder: integer('sort_order').notNull().default(0),
-  ...timestamps,
-});
+export const groups = sqliteTable(
+  'groups',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    /** Besitzer des Dashboards; null nur bei Altbestand ohne Benutzer (wird beim ersten Admin eingesammelt). */
+    userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    icon: text('icon'),
+    collapsed: integer('collapsed', { mode: 'boolean' }).notNull().default(false),
+    sortOrder: integer('sort_order').notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [index('groups_user_idx').on(table.userId, table.sortOrder)],
+);
 
 export const services = sqliteTable(
   'services',

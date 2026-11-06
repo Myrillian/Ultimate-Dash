@@ -1,4 +1,7 @@
 import type {
+  CopyDashboardInput,
+  CopySummary,
+  DashboardSource,
   IpamCategory,
   IpamCategoryInput,
   IpamData,
@@ -105,6 +108,9 @@ export const api = {
   deleteUser: (id: number) => request<void>('DELETE', `/users/${id}`),
 
   dashboard: () => request<DashboardData>('GET', '/dashboard'),
+  dashboardSources: () => request<DashboardSource[]>('GET', '/dashboards'),
+  copyDashboard: (input: CopyDashboardInput) =>
+    request<CopySummary>('POST', '/dashboard/copy', input),
   importConfig: (input: ImportRequest) => request<ImportSummary>('POST', '/config/import', input),
   iconCatalog: () => request<IconCatalog>('GET', '/icons'),
   searchIconify: (q: string) =>
