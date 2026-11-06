@@ -130,6 +130,12 @@
                   <p class="truncate text-sm font-medium">
                     {user.username}
                     {#if self}<span class="text-fg-muted">(du)</span>{/if}
+                    {#if user.oidc}
+                      <span
+                        class="ml-1 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-fg-muted"
+                        title="Meldet sich über den SSO-Anbieter an">SSO</span
+                      >
+                    {/if}
                   </p>
                   <p class="text-xs text-fg-muted">
                     {user.lastLoginAt
@@ -153,7 +159,9 @@
                   <button
                     type="button"
                     class="icon-btn"
-                    aria-label="Passwort für {user.username} zurücksetzen"
+                    aria-label="{user.hasPassword
+                      ? 'Passwort zurücksetzen'
+                      : 'Lokales Passwort setzen'} für {user.username}"
                     aria-expanded={editing?.id === user.id && editing.kind === 'password'}
                     onclick={() => startEdit(user.id, 'password')}
                   >
@@ -206,6 +214,12 @@
             </li>
           {/each}
         </ul>
+        {#if auth.oidc?.rolesFromGroups && users.some((u) => u.oidc)}
+          <p class="field-hint mt-2">
+            Die Rolle von SSO-Benutzern wird bei jeder Anmeldung aus ihren Gruppen beim Anbieter
+            übernommen. Änderungen hier gelten nur bis zur nächsten Anmeldung.
+          </p>
+        {/if}
       {/if}
     </section>
 

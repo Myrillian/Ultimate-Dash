@@ -16,6 +16,8 @@ export const toUser = (row: UserRow): User => ({
   role: row.role,
   createdAt: row.createdAt,
   lastLoginAt: row.lastLoginAt,
+  hasPassword: row.passwordHash !== null,
+  oidc: row.oidcSubject !== null,
 });
 
 const hashToken = (token: string) => createHash('sha256').update(token).digest('base64url');
@@ -29,6 +31,21 @@ export function createAuthStore(db: Db) {
 
     findByUsername(username: string): UserRow | undefined {
       return db.select().from(users).where(eq(users.username, username)).get();
+    },
+
+    findByOidcSubject(subject: string): UserRow | undefined {
+      return db.select().from(users).where(eq(users.oidcSubject, subject)).get();
+    },
+
+    /** Legt einen OIDC-Benutzer ohne Passwort an; bei Namensgleichheit mit Zähler (anna-2). */
+    createOidcUser(preferredName: string, subject: string, role: Role): UserRow {
+      let username = preferredName;
+      for (let n = 2; this.findByUsername(username); n++) username = `${preferredName}-${n}`;
+      return db
+        .insert(users)
+        .values({ username, passwordHash: null, oidcSubject: subject, role })
+        .returning()
+        .get();
     },
 
     getUser(id: number): UserRow {
@@ -58,7 +75,10 @@ export function createAuthStore(db: Db) {
       });
     },
 
-    updateUser(id: number, changes: { role?: Role; passwordHash?: string }): User {
+    updateUser(
+      id: number,
+      changes: { role?: Role; passwordHash?: string | null; oidcSubject?: string | null },
+    ): User {
       const current = this.getUser(id);
       if (changes.role && changes.role !== 'admin' && current.role === 'admin')
         this.assertOtherAdmin(id);

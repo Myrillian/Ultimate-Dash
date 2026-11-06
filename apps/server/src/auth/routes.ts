@@ -12,17 +12,21 @@ import { ValidationError } from '../db/repository.js';
 import { clearSessionCookie, setSessionCookie } from './guard.js';
 import { burnPasswordCheck, hashPassword, verifyPassword } from './password.js';
 import type { LoginRateLimiter } from './rate-limit.js';
+import type { Oidc } from './oidc.js';
 import { toUser, type AuthStore } from './store.js';
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
 
 export async function authRoutes(
   app: FastifyInstance,
-  { store, limiter }: { store: AuthStore; limiter: LoginRateLimiter },
+  { store, limiter, oidc }: { store: AuthStore; limiter: LoginRateLimiter; oidc: Oidc | null },
 ) {
+  if (oidc) await app.register(oidc.routes);
+
   app.get('/auth/status', async (request): Promise<AuthStatus> => ({
     setupRequired: store.userCount() === 0,
     user: request.user,
+    oidc: oidc?.status ?? null,
   }));
 
   app.post('/auth/setup', async (request, reply) => {
@@ -74,7 +78,10 @@ export async function authRoutes(
   app.post('/auth/password', async (request, reply) => {
     const { currentPassword, newPassword } = passwordChangeInput.parse(request.body);
     const row = store.getUser(request.user!.id);
-    if (!row.passwordHash || !(await verifyPassword(currentPassword, row.passwordHash))) {
+    if (!row.passwordHash) {
+      throw new ValidationError('Dieses Konto meldet sich über OIDC an und hat kein Passwort');
+    }
+    if (!(await verifyPassword(currentPassword, row.passwordHash))) {
       throw new ValidationError('Das aktuelle Passwort ist falsch');
     }
     store.updateUser(row.id, { passwordHash: await hashPassword(newPassword) });

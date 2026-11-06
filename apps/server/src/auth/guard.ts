@@ -18,6 +18,8 @@ const PUBLIC_ROUTES = new Set([
   'GET /api/auth/status',
   'POST /api/auth/login',
   'POST /api/auth/setup',
+  'GET /api/auth/oidc/start',
+  'GET /api/auth/oidc/callback',
 ]);
 
 /** Schreibende Aufrufe, die auch „Nur lesen“-Benutzer für sich selbst machen dürfen. */

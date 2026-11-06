@@ -76,7 +76,30 @@ Passwörter werden mit scrypt gespeichert, Sitzungen laufen 30 Tage und verläng
 
 **Admin-Passwort vergessen?** Container stoppen, die Datei `/data/ultimate-dash.db` sichern und auf dem Host die Tabellen `users` und `sessions` leeren, zum Beispiel mit `sqlite3 ultimate-dash.db "DELETE FROM sessions; DELETE FROM users;"` (das Image enthält kein `sqlite3`). Beim nächsten Aufruf startet die Ersteinrichtung erneut, Dashboard-Inhalte bleiben erhalten.
 
-Anmeldung über OIDC (z. B. Authentik, Keycloak) folgt in einem eigenen Schritt.
+### Anmeldung über OIDC (Authentik, Keycloak, Authelia, Pocket ID …)
+
+Mit OIDC erscheint auf der Anmeldeseite zusätzlich ein Knopf für deinen SSO-Anbieter. Das lokale Admin-Konto aus der Ersteinrichtung bleibt als Notzugang bestehen.
+
+1. Beim Anbieter eine OIDC-Anwendung („confidential client“) anlegen.
+   Redirect-URI: `https://<deine-dashboard-adresse>/api/auth/oidc/callback`
+2. Umgebungsvariablen setzen und den Container neu starten:
+
+| Variable                | Standard               | Bedeutung                                                                                                                              |
+| ----------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `OIDC_ISSUER`           |                        | Issuer-URL, z. B. `https://auth.example.org/application/o/ultimate-dash/` (Authentik)                                                  |
+| `OIDC_CLIENT_ID`        |                        | Client-ID                                                                                                                              |
+| `OIDC_CLIENT_SECRET`    |                        | Client-Secret (leer lassen bei öffentlichen Clients)                                                                                   |
+| `OIDC_REDIRECT_URI`     | aus der Anfrage        | Feste Callback-Adresse, falls der Reverse-Proxy `Host`/`X-Forwarded-Proto` nicht korrekt weitergibt                                    |
+| `OIDC_SCOPES`           | `openid profile email` | Für Gruppen ggf. `groups` ergänzen (Authelia, Keycloak mit Mapper)                                                                     |
+| `OIDC_BUTTON_LABEL`     | `Mit SSO anmelden`     | Beschriftung des Knopfs                                                                                                                |
+| `OIDC_GROUPS_CLAIM`     | `groups`               | Claim mit den Gruppen                                                                                                                  |
+| `OIDC_ADMIN_GROUPS`     |                        | Kommagetrennt. Mitglieder werden Admin, alle anderen „Nur lesen“; wird bei jeder Anmeldung abgeglichen                                 |
+| `OIDC_ALLOWED_GROUPS`   |                        | Kommagetrennt. Nur Mitglieder dürfen sich anmelden                                                                                     |
+| `OIDC_AUTO_CREATE`      | `true`                 | Unbekannte Konten beim ersten Login anlegen; bei `false` werden nur bereits verknüpfte Konten angemeldet                               |
+| `OIDC_LINK_BY_USERNAME` | `false`                | Erste SSO-Anmeldung mit einem gleichnamigen lokalen Benutzer verbinden (nur, wenn Benutzernamen beim Anbieter nicht frei wählbar sind) |
+| `OIDC_TLS_INSECURE`     | `false`                | Selbstsignierte Zertifikate des Anbieters akzeptieren                                                                                  |
+
+Konten werden über den `sub`-Claim des Anbieters zugeordnet, eine Umbenennung dort ist also unproblematisch. Ohne `OIDC_ADMIN_GROUPS` werden neue SSO-Benutzer als „Nur lesen“ angelegt, und ein Admin vergibt die Rolle in der Benutzerverwaltung. Damit der letzte Admin sich nicht aussperrt, wird er durch fehlende Gruppen nie herabgestuft. Abmelden beendet nur die Sitzung im Dashboard, nicht die beim Anbieter.
 
 ## Icons
 

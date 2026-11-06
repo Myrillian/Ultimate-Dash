@@ -58,18 +58,20 @@
     >
       <div class="border-b border-line px-2.5 pt-1.5 pb-2.5">
         <p class="truncate text-sm font-medium">{auth.user?.username}</p>
-        <p class="text-xs text-fg-muted">{roleLabel}</p>
+        <p class="text-xs text-fg-muted">{roleLabel}{auth.user?.oidc ? ' · SSO' : ''}</p>
       </div>
       <ul class="grid pt-1.5">
-        <li>
-          <button
-            type="button"
-            class="menu-item"
-            onclick={() => choose(() => (passwordOpen = true))}
-          >
-            <UiIcon name="key" size={16} /> Passwort ändern
-          </button>
-        </li>
+        {#if auth.user?.hasPassword}
+          <li>
+            <button
+              type="button"
+              class="menu-item"
+              onclick={() => choose(() => (passwordOpen = true))}
+            >
+              <UiIcon name="key" size={16} /> Passwort ändern
+            </button>
+          </li>
+        {/if}
         {#if auth.isAdmin}
           <li>
             <button

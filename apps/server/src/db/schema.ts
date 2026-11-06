@@ -53,7 +53,10 @@ export const settings = sqliteTable('settings', {
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   username: text('username').notNull().unique(),
+  /** null bei Benutzern, die sich nur über OIDC anmelden. */
   passwordHash: text('password_hash'),
+  /** „sub“-Claim des OIDC-Anbieters; verknüpft das Konto dauerhaft mit der Identität dort. */
+  oidcSubject: text('oidc_subject').unique(),
   role: text('role', { enum: ['admin', 'viewer'] })
     .notNull()
     .default('viewer'),

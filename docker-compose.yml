@@ -9,4 +9,10 @@ services:
     environment:
       # Abstand der Statusprüfungen in Sekunden
       STATUS_INTERVAL_SECONDS: 60
+      # Optional: Anmeldung über OIDC (siehe README)
+      # OIDC_ISSUER: https://auth.example.org/application/o/ultimate-dash/
+      # OIDC_CLIENT_ID: ultimate-dash
+      # OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      # OIDC_BUTTON_LABEL: Mit Authentik anmelden
+      # OIDC_ADMIN_GROUPS: homelab-admins
     restart: unless-stopped
