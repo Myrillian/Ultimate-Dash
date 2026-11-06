@@ -101,10 +101,10 @@ Das Dashboard (Gruppen, Dienste, Reihenfolge, eingeklappte Gruppen) gehört kün
 
 - **Datenmodell:** Gruppen bekommen einen Besitzer (`user_id`), Dienste hängen wie bisher an Gruppen. Beim Löschen eines Benutzers fällt sein Dashboard mit weg.
 - **Bestehende Daten:** Das heutige Dashboard geht bei der Migration an den ersten Admin-Account. Alle anderen Benutzer starten leer.
-- **Bearbeiten:** Jeder Benutzer, auch ohne Admin-Rolle, bearbeitet sein eigenes Dashboard. Die Leserechte-Regel gilt für IPAM, DHCP und DNS, nicht für die persönliche Ansicht.
+- **Bearbeiten:** Jeder Benutzer, auch ohne Admin-Rolle, bearbeitet sein eigenes Dashboard, weil jeder andere Dienste pflegen möchte. Die Leserechte-Regel gilt für IPAM, DHCP und DNS, nicht für die persönliche Ansicht.
 - **Statusprüfung:** Der Server prüft jeden Dienst nur einmal, auch wenn mehrere Benutzer dieselbe Adresse haben; jeder sieht den Status seiner Dienste.
 - **Export und Import:** beziehen sich auf das eigene Dashboard.
-- **Optional:** „Dashboard kopieren von …“ für neue Benutzer, damit sie nicht bei null anfangen.
+- **Kopieren von …:** Neue Benutzer starten leer, können aber Einträge aus dem Dashboard eines anderen Benutzers übernehmen. Der Dialog zeigt dessen Gruppen und Dienste als Baum mit **Kontrollkästchen je Gruppe und je Dienst**; ausgewählt wird, was kopiert werden soll. Kopiert wird eine unabhängige Kopie, spätere Änderungen wirken sich nicht auf das Original aus. Bereits vorhandene Gruppen mit gleichem Namen werden ergänzt statt doppelt angelegt.
 
 
 - **Backend:** Neuer Endpunkt `GET /api/ipam/ips/:adresse` (und Liste mit Filtern) liefert den IP-Eintrag. Er nutzt die vorhandenen Dienste (DHCP, DNS-Records, Ping-Daten). Dazu ein Reverse-Index der DNS-Einträge (A auf IP, PTR, CNAMEs auf Namen), der wie die Belegung 15 Sekunden gecacht wird.
@@ -129,8 +129,9 @@ Jeder Schritt ist ein eigener Pull Request und nach dem Merge benutzbar.
 
 - Hersteller aus der MAC wird angezeigt (mitgelieferte OUI-Liste).
 - Der Assistent legt nur eine IP pro Vorgang an.
+- Jeder Benutzer bearbeitet sein eigenes Dashboard (auch ohne Admin-Rolle); neue Benutzer starten leer und können mit Kontrollkästchen je Eintrag von anderen kopieren.
 - Dashboard und Ansichten sind pro Benutzer, die IPAM-, DHCP- und DNS-Daten für alle gleich. Ohne Admin-Rolle nur Leserechte.
 
 ## Offene Punkte
 
-- **Dashboard pro Benutzer:** Dürfen auch Benutzer ohne Admin-Rolle ihr eigenes Dashboard bearbeiten (Vorschlag: ja)? Und sollen neue Benutzer leer starten oder eine Kopie bekommen (Vorschlag: leer, Kopieren optional)?
+- Keine. Das Konzept ist zur Freigabe bereit.
