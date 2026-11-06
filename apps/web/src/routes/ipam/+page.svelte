@@ -12,7 +12,7 @@
     IpamSync,
     IpamUsage,
   } from '@ultimate-dash/shared';
-  import { ipv4RangeSize, ipv4ToInt, parseCidr } from '@ultimate-dash/shared';
+  import { ipv4RangeSize, parseCidr } from '@ultimate-dash/shared';
   import { api } from '$lib/api';
   import { auth } from '$lib/auth.svelte';
   import { formatAgo, formatPercent } from '$lib/format';
@@ -22,11 +22,11 @@
   import CategoriesDialog from '$lib/components/CategoriesDialog.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import IpGrid from '$lib/components/IpGrid.svelte';
+  import IpList from '$lib/components/IpList.svelte';
   import IpPanel from '$lib/components/IpPanel.svelte';
   import IpWizard from '$lib/components/IpWizard.svelte';
   import NetworkForm from '$lib/components/NetworkForm.svelte';
   import HostDialog from '$lib/components/HostDialog.svelte';
-  import ReachDot from '$lib/components/ReachDot.svelte';
   import ScanDialog from '$lib/components/ScanDialog.svelte';
   import SyncPanel from '$lib/components/SyncPanel.svelte';
   import RangeForm from '$lib/components/RangeForm.svelte';
@@ -43,7 +43,6 @@
     open: false,
     row: null,
   });
-  let filter = $state<'all' | 'discovered' | 'offline'>('all');
   let loaded = $state(false);
   let error = $state<string | null>(null);
   let refreshing = $state(false);
@@ -63,7 +62,6 @@
     message: string;
     action: () => Promise<void>;
   }>({ open: false, title: '', message: '', action: async () => {} });
-  let query = $state('');
 
   // Adresse im Seitenfenster; steht in der URL (?ip=), damit Links und Zurück-Taste funktionieren.
   const panelAddress = $derived(page.url.searchParams.get('ip'));
@@ -95,23 +93,6 @@
       ? buildCells(network, data.ranges, data.categories, netUsage)
       : [],
   );
-
-  const rows = $derived(
-    (netUsage?.addresses ?? []).filter((a) => {
-      if (filter === 'discovered' && !a.discovered) return false;
-      if (filter === 'offline' && a.alive !== false) return false;
-      const q = query.trim().toLowerCase();
-      if (!q) return true;
-      return (
-        a.address.includes(q) ||
-        a.claims.some((c) => c.name?.toLowerCase().includes(q) || c.mac?.toLowerCase().includes(q))
-      );
-    }),
-  );
-  const rangeOf = (address: string): IpamRange | undefined => {
-    const n = ipv4ToInt(address)!;
-    return netRanges.find((r) => n >= ipv4ToInt(r.startAddress)! && n <= ipv4ToInt(r.endAddress)!);
-  };
 
   /** Ein Durchlauf auf Abruf; wir fragen den Stand ab, bis er fertig ist, und laden dann neu. */
   async function runScan() {
@@ -271,15 +252,6 @@
     const assigned = parts.reduce((sum, p) => sum + p.size, 0);
     return { hosts, parts, unassigned: Math.max(0, hosts - assigned), u };
   }
-
-  const typeLabel = { reservation: 'Reservierung', lease: 'Lease', static: 'Statisch' } as const;
-  const sourceLabel = {
-    lease: 'DHCP-Lease',
-    reservation: 'DHCP-Reservierung',
-    dns: 'DNS',
-    discovered: 'Ping',
-    manual: 'Von Hand',
-  } as const;
 </script>
 
 {#snippet scanInfo()}
@@ -691,140 +663,19 @@
       </div>
 
       <section aria-label="Belegte Adressen" class="grid min-w-0 gap-3">
-        <div class="flex flex-wrap items-center gap-3">
-          <h3 class="font-semibold">Belegte Adressen</h3>
-          <div class="flex gap-1" role="group" aria-label="Filter">
-            {#each [['all', 'Alle'], ['discovered', `Entdeckt${netUsage?.discovered ? ` (${netUsage.discovered})` : ''}`], ['offline', 'Offline']] as [value, text] (value)}
-              <button
-                type="button"
-                class="btn px-2.5 py-1 text-xs"
-                class:bg-muted={filter === value}
-                aria-pressed={filter === value}
-                onclick={() => (filter = value as typeof filter)}>{text}</button
-              >
-            {/each}
-          </div>
-          <div class="relative ml-auto w-full sm:w-64">
-            <UiIcon
-              name="search"
-              size={16}
-              class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-muted"
-            />
-            <input
-              class="input pl-9"
-              type="search"
-              placeholder="Adresse, Name oder MAC"
-              aria-label="Belegte Adressen durchsuchen"
-              bind:value={query}
-            />
-          </div>
-        </div>
+        <h3 class="font-semibold">Belegte Adressen</h3>
         {#if !netUsage}
           <p class="text-sm text-fg-muted">Ohne Verbindung zu Technitium gibt es keine Belegung.</p>
-        {:else if rows.length === 0}
-          <p class="text-sm text-fg-muted">
-            {query || filter !== 'all'
-              ? 'Keine Treffer.'
-              : 'Keine belegten Adressen in diesem Netz.'}
-          </p>
         {:else}
-          <div class="relative overflow-x-auto rounded-2xl border border-line bg-elevated">
-            <table class="w-full text-left text-sm">
-              <thead class="text-xs text-fg-muted">
-                <tr class="border-b border-line">
-                  <th class="px-3 py-2 font-medium">Adresse</th>
-                  <th class="px-3 py-2 font-medium">Name</th>
-                  <th class="px-3 py-2 font-medium">Typ</th>
-                  <th class="px-3 py-2 font-medium">Status</th>
-                  <th class="px-3 py-2 font-medium">Quelle</th>
-                  <th class="px-3 py-2 font-medium">MAC</th>
-                  <th class="px-3 py-2 font-medium">Kategorie</th>
-                  <th class="px-3 py-2"><span class="sr-only">Aktionen</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each rows as row (row.address)}
-                  {@const cat = categoryOf(rangeOf(row.address)?.categoryId ?? 0)}
-                  <tr
-                    class="border-t border-line align-top"
-                    class:bg-muted={panelAddress === row.address}
-                    style={row.discovered ? 'background: var(--discovered-bg)' : ''}
-                  >
-                    <td class="px-3 py-2 font-mono text-xs whitespace-nowrap">
-                      <button
-                        type="button"
-                        class="font-mono text-xs text-accent hover:underline"
-                        aria-label="Details zu {row.address} öffnen"
-                        onclick={() => openPanel(row.address)}>{row.address}</button
-                      >
-                      {#if row.conflict}<span class="ml-1 font-sans font-semibold text-down"
-                          >Konflikt</span
-                        >{/if}
-                    </td>
-                    <td class="px-3 py-2">
-                      {#each [...new Set(row.claims
-                            .map((c) => c.name)
-                            .filter(Boolean))] as name (name)}
-                        <span class="block">{name}</span>
-                      {:else}–{/each}
-                    </td>
-                    <td class="px-3 py-2 whitespace-nowrap">
-                      {typeLabel[row.type]}
-                      {#if row.discovered}
-                        <span
-                          class="ml-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold"
-                          style="color: var(--discovered); border: 1px solid var(--discovered)"
-                          >Entdeckt</span
-                        >
-                      {/if}
-                    </td>
-                    <td class="px-3 py-2"><ReachDot alive={row.alive} lastSeen={row.lastSeen} /></td
-                    >
-                    <td class="px-3 py-2 whitespace-nowrap text-fg-muted">
-                      {[...new Set(row.claims.map((c) => sourceLabel[c.source]))].join(', ')}
-                    </td>
-                    <td class="px-3 py-2 font-mono text-xs whitespace-nowrap">
-                      {#each [...new Set(row.claims
-                            .map((c) => c.mac)
-                            .filter(Boolean))] as mac (mac)}
-                        <span class="block">{mac}</span>
-                      {:else}–{/each}
-                    </td>
-                    <td class="px-3 py-2 whitespace-nowrap">
-                      {#if cat}
-                        <span class="flex items-center gap-2">
-                          <span
-                            class="size-2.5 rounded-sm"
-                            style="background: {categoryColor(cat.color)}"
-                          ></span>
-                          {cat.name}
-                        </span>
-                      {:else}<span class="text-fg-muted">–</span>{/if}
-                    </td>
-                    <td class="px-3 py-2 text-right whitespace-nowrap">
-                      {#if auth.isAdmin && row.claims.some((c) => c.hostId !== null)}
-                        <button
-                          type="button"
-                          class="btn px-2.5 py-1 text-xs"
-                          aria-label="{row.address} {row.discovered ? 'bestätigen' : 'bearbeiten'}"
-                          onclick={() => (hostForm = { open: true, row })}
-                          >{row.discovered ? 'Bestätigen' : 'Bearbeiten'}</button
-                        >
-                        <button
-                          type="button"
-                          class="icon-btn"
-                          aria-label="{row.address} vergessen"
-                          onclick={() => forget(row)}
-                        >
-                          <UiIcon name="trash" size={16} />
-                        </button>
-                      {/if}
-                    </td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
+          <IpList
+            addresses={netUsage.addresses}
+            ranges={netRanges}
+            categories={data.categories}
+            selected={panelAddress}
+            onopen={openPanel}
+            onhost={(row) => (hostForm = { open: true, row })}
+            onforget={forget}
+          />
         {/if}
       </section>
     {/if}

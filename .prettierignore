@@ -4,3 +4,4 @@ build
 .svelte-kit
 apps/server/drizzle
 docs
+apps/server/src/ipam/oui.json

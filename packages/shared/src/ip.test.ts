@@ -6,6 +6,8 @@ import {
   ipv4RangeSize,
   ipv4Segments,
   ipv4ToInt,
+  isRandomMac,
+  macPrefix,
   maskToPrefix,
 } from './ip.js';
 
@@ -65,5 +67,19 @@ describe('ipv4Segments', () => {
     expect(ipv4Segments('10.0.0.5', '10.0.0.9', [])).toEqual([
       { start: '10.0.0.5', end: '10.0.0.9' },
     ]);
+  });
+});
+
+describe('MAC-Hilfen', () => {
+  it('liest die Herstellerkennung', () => {
+    expect(macPrefix('00-11-32-aa-bb-cc')).toBe('001132');
+    expect(macPrefix('00:11:32:AA:BB:CC')).toBe('001132');
+    expect(macPrefix('kaputt')).toBeNull();
+  });
+  it('erkennt zufällige MAC-Adressen am lokal-verwaltet-Bit', () => {
+    expect(isRandomMac('DA-A1-19-00-00-01')).toBe(true);
+    expect(isRandomMac('02-00-00-00-00-01')).toBe(true);
+    expect(isRandomMac('00-11-32-AA-BB-CC')).toBe(false);
+    expect(isRandomMac('kaputt')).toBe(false);
   });
 });

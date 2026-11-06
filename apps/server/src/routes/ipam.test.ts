@@ -220,6 +220,19 @@ describe('IPAM-Belegung', () => {
   });
 });
 
+describe('Hersteller', () => {
+  it('liefert Hersteller zu Kennungen, auch für Nur-lesen-Benutzer, und ignoriert Ungültiges', async () => {
+    await setup();
+    const res = await call('GET', '/api/ipam/vendors?prefixes=001132,B827eb,ZZZZZZ,FFFFFF');
+    expect(res.statusCode).toBe(200);
+    const map = res.json<Record<string, string | null>>();
+    expect(map['001132']).toMatch(/Synology/);
+    expect(map['B827EB']).toMatch(/Raspberry/);
+    expect(map).not.toHaveProperty('ZZZZZZ');
+    expect(Object.keys(map)).toHaveLength(3);
+  });
+});
+
 describe('IP-Detail', () => {
   it('liefert Reservierung, DNS und Reverse-Eintrag zu einer Adresse', async () => {
     const { network, servers } = await setup();

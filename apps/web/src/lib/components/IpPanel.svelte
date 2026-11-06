@@ -11,6 +11,7 @@
   import { fullName, type RecordFormValues } from '$lib/dns-records';
   import { categoryColor } from '$lib/ipam';
   import { toasts } from '$lib/toasts.svelte';
+  import { vendors } from '$lib/vendors.svelte';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import ConvertLeaseDialog, { type ConvertValues } from './ConvertLeaseDialog.svelte';
   import HostDialog from './HostDialog.svelte';
@@ -306,6 +307,10 @@
       'Gerät vergessen',
     );
 
+  $effect(() => {
+    void vendors.ensure([detail?.dhcp.reservation?.mac, detail?.dhcp.lease?.mac]);
+  });
+
   const category = $derived(categories.find((c) => c.id === detail?.categoryId) ?? null);
   const typeLabel = { reservation: 'Reservierung', lease: 'Lease', static: 'Statisch' } as const;
   const isGateway = $derived(!!network?.gateway && network.gateway === address);
@@ -432,7 +437,10 @@
             <dt class="text-fg-muted">Reservierung</dt>
             <dd>{r.scope}</dd>
             <dt class="text-fg-muted">MAC</dt>
-            <dd class="font-mono text-xs">{r.mac}</dd>
+            <dd>
+              <span class="font-mono text-xs">{r.mac}</span>
+              <span class="block text-xs text-fg-muted">{vendors.label(r.mac)}</span>
+            </dd>
             <dt class="text-fg-muted">Hostname</dt>
             <dd>{r.hostName ?? '–'}</dd>
             <dt class="text-fg-muted">Kommentar</dt>
@@ -462,7 +470,10 @@
             <dt class="text-fg-muted">Lease</dt>
             <dd>{l.scope}</dd>
             <dt class="text-fg-muted">MAC</dt>
-            <dd class="font-mono text-xs">{l.mac}</dd>
+            <dd>
+              <span class="font-mono text-xs">{l.mac}</span>
+              <span class="block text-xs text-fg-muted">{vendors.label(l.mac)}</span>
+            </dd>
             <dt class="text-fg-muted">Hostname</dt>
             <dd>{l.hostName ?? '–'}</dd>
             <dt class="text-fg-muted">Erhalten</dt>
