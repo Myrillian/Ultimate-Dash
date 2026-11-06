@@ -95,7 +95,17 @@ Oben ein gemeinsamer Bereich „Netzwerk“ mit den Reitern:
 
 DNS und DHCP bleiben erreichbar und behalten ihre Listen. Wer an einem Eintrag klickt, landet im selben Seitenfenster wie in der IP-Ansicht. So gibt es überall dieselbe Bearbeitung.
 
-## Technik
+## Dashboard pro Benutzer
+
+Das Dashboard (Gruppen, Dienste, Reihenfolge, eingeklappte Gruppen) gehört künftig dem einzelnen Benutzer. IPAM, DHCP und DNS bleiben für alle gleich.
+
+- **Datenmodell:** Gruppen bekommen einen Besitzer (`user_id`), Dienste hängen wie bisher an Gruppen. Beim Löschen eines Benutzers fällt sein Dashboard mit weg.
+- **Bestehende Daten:** Das heutige Dashboard geht bei der Migration an den ersten Admin-Account. Alle anderen Benutzer starten leer.
+- **Bearbeiten:** Jeder Benutzer, auch ohne Admin-Rolle, bearbeitet sein eigenes Dashboard. Die Leserechte-Regel gilt für IPAM, DHCP und DNS, nicht für die persönliche Ansicht.
+- **Statusprüfung:** Der Server prüft jeden Dienst nur einmal, auch wenn mehrere Benutzer dieselbe Adresse haben; jeder sieht den Status seiner Dienste.
+- **Export und Import:** beziehen sich auf das eigene Dashboard.
+- **Optional:** „Dashboard kopieren von …“ für neue Benutzer, damit sie nicht bei null anfangen.
+
 
 - **Backend:** Neuer Endpunkt `GET /api/ipam/ips/:adresse` (und Liste mit Filtern) liefert den IP-Eintrag. Er nutzt die vorhandenen Dienste (DHCP, DNS-Records, Ping-Daten). Dazu ein Reverse-Index der DNS-Einträge (A auf IP, PTR, CNAMEs auf Namen), der wie die Belegung 15 Sekunden gecacht wird.
 - **Aktionen:** Ein Dienst „IP-Aktionen“ bündelt die Mehrschritt-Abläufe (Reservierung plus DNS plus PTR, Umwandeln, Umbenennen) mit Rücknahme bei Fehlern und einem Audit-Eintrag je Ablauf. Die Validierung liegt in `packages/shared`.
@@ -105,6 +115,7 @@ DNS und DHCP bleiben erreichbar und behalten ihre Listen. Wer an einem Eintrag k
 
 ## Umsetzung in Schritten
 
+0. **Dashboard pro Benutzer:** Migration, Besitzer je Gruppe, Statusprüfung ohne Doppelarbeit. Unabhängig vom Rest und deshalb zuerst oder parallel möglich.
 1. **IP-Eintrag und Seitenfenster (nur Lesen):** Zusammenführung, Klick im Raster und in der Liste, Anzeige aller Teile.
 2. **Aktionen im Seitenfenster:** Lease in Reservierung umwandeln und freigeben, Reservierung bearbeiten und löschen, DNS bearbeiten, statische Einträge pflegen, Entdeckte bestätigen.
 3. **Assistent „Neue IP“** und Klick auf freie Blöcke.
@@ -118,8 +129,8 @@ Jeder Schritt ist ein eigener Pull Request und nach dem Merge benutzbar.
 
 - Hersteller aus der MAC wird angezeigt (mitgelieferte OUI-Liste).
 - Der Assistent legt nur eine IP pro Vorgang an.
-- Ansichten sind pro Benutzer, die IPAM-, DHCP- und DNS-Daten für alle gleich. Ohne Admin-Rolle nur Leserechte.
+- Dashboard und Ansichten sind pro Benutzer, die IPAM-, DHCP- und DNS-Daten für alle gleich. Ohne Admin-Rolle nur Leserechte.
 
 ## Offene Punkte
 
-- **Dashboard pro Benutzer:** Gruppen und Dienste des Dashboards sind heute für alle gleich. Eine eigene Dashboard-Ansicht je Benutzer wäre eine eigene Änderung (Datenmodell und Oberfläche) und gehört nicht zu dieser Konzeptseite. Soll sie als eigener Punkt in die Planung?
+- **Dashboard pro Benutzer:** Dürfen auch Benutzer ohne Admin-Rolle ihr eigenes Dashboard bearbeiten (Vorschlag: ja)? Und sollen neue Benutzer leer starten oder eine Kopie bekommen (Vorschlag: leer, Kopieren optional)?
