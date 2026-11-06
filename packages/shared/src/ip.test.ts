@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { intToIpv4, ipv4InRange, ipv4PoolSize, ipv4RangeSize, ipv4ToInt } from './ip.js';
+import {
+  intToIpv4,
+  ipv4InRange,
+  ipv4PoolSize,
+  ipv4RangeSize,
+  ipv4Segments,
+  ipv4ToInt,
+  maskToPrefix,
+} from './ip.js';
 
 describe('IPv4-Hilfen', () => {
   it('wandelt Adressen hin und zurück', () => {
@@ -25,5 +33,37 @@ describe('IPv4-Hilfen', () => {
       { startingAddress: '10.0.0.95', endingAddress: '10.0.0.200' },
     ]);
     expect(pool).toBe(100 - 20 - 6);
+  });
+});
+
+describe('maskToPrefix', () => {
+  it('liest Netzmasken', () => {
+    expect(maskToPrefix('255.255.255.0')).toBe(24);
+    expect(maskToPrefix('255.255.252.0')).toBe(22);
+    expect(maskToPrefix('255.255.255.252')).toBe(30);
+    expect(maskToPrefix('0.0.0.0')).toBe(0);
+  });
+  it('lehnt unzusammenhängende Masken ab', () => {
+    expect(maskToPrefix('255.0.255.0')).toBeNull();
+    expect(maskToPrefix('nope')).toBeNull();
+  });
+});
+
+describe('ipv4Segments', () => {
+  it('zieht Ausschlüsse ab', () => {
+    expect(
+      ipv4Segments('10.0.0.1', '10.0.0.254', [
+        { startingAddress: '10.0.0.1', endingAddress: '10.0.0.99' },
+        { startingAddress: '10.0.0.200', endingAddress: '10.0.0.210' },
+      ]),
+    ).toEqual([
+      { start: '10.0.0.100', end: '10.0.0.199' },
+      { start: '10.0.0.211', end: '10.0.0.254' },
+    ]);
+  });
+  it('ohne Ausschlüsse bleibt der ganze Bereich', () => {
+    expect(ipv4Segments('10.0.0.5', '10.0.0.9', [])).toEqual([
+      { start: '10.0.0.5', end: '10.0.0.9' },
+    ]);
   });
 });

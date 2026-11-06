@@ -19,6 +19,7 @@ import { apiRoutes } from './routes/api.js';
 import { configRoutes } from './routes/config.js';
 import { iconRoutes } from './routes/icons.js';
 import { IpamRepository } from './ipam/repository.js';
+import { IpamSyncService } from './ipam/sync.js';
 import { IpamUsageService } from './ipam/usage.js';
 import { ipamRoutes } from './routes/ipam.js';
 import { technitiumRoutes } from './routes/technitium.js';
@@ -114,7 +115,8 @@ export async function buildApp(
     zones: () => technitium.zones(),
     records: (zone) => technitium.records(zone),
   });
-  await app.register(ipamRoutes, { prefix: '/api', repo: ipam, usage: ipamUsage });
+  const ipamSync = new IpamSyncService({ repo: ipam, audit, scopes: () => dhcp.scopes() });
+  await app.register(ipamRoutes, { prefix: '/api', repo: ipam, usage: ipamUsage, sync: ipamSync });
 
   if (config.webRoot && existsSync(config.webRoot)) {
     await app.register(fastifyStatic, {

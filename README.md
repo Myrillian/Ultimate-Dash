@@ -181,4 +181,6 @@ Unter **IPAM** (Umschalter neben DNS und DHCP) verwaltest du deine Netze:
 - **IP-Bereiche**: Jedes Netz wird in Bereiche je Kategorie eingeteilt. Bereiche liegen im Netz und überschneiden sich nicht.
 - **Belegung** kommt live aus Technitium: DHCP-Leases, Reservierungen und DNS-A-Einträge. Das Raster (bis /22) zeigt jede Adresse farbig nach Kategorie, mit Zustand belegt, reserviert, DHCP-Pool, frei oder Konflikt (zwei Geräte beanspruchen dieselbe IP). Es ist per Pfeiltasten bedienbar, die Liste darunter nennt alle belegten Adressen mit Name, Quelle und MAC.
 
+**Abgleich mit Technitium:** Hat ein DHCP-Scope noch kein Netz im IPAM, bietet die Netzübersicht (für Admins) an, es zu übernehmen. Name, Netz, Gateway und Domäne kommen aus Technitium; auf Wunsch wird der verteilbare Bereich (Scope-Bereich ohne Ausschlüsse) als Bereich der Kategorie „DHCP“ angelegt. Weicht bei einem bestehenden Netz das Gateway vom Scope ab, steht das im Netz mit einem Knopf zum Übernehmen. Abgeglichen wird nur beim Öffnen, geändert wird nie von selbst und nie etwas in Technitium.
+
 Ohne Verbindung zu Technitium lassen sich Netze und Bereiche trotzdem pflegen, nur die Belegung fehlt. Änderungen sind Admins vorbehalten und stehen im Änderungsprotokoll.
