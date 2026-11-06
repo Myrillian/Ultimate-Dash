@@ -56,7 +56,7 @@ export async function buildApp(
   const monitor = new StatusMonitor({
     intervalMs: config.statusIntervalSeconds * 1000,
     timeoutMs: config.statusTimeoutMs,
-    listServices: () => repo.listServices(),
+    listServices: () => repo.listAllServices(),
     events,
     onError: (error) => app.log.error({ err: error }, 'Statusprüfung fehlgeschlagen'),
   });

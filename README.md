@@ -74,7 +74,9 @@ pnpm format       # Formatierung
 Beim ersten Aufruf legst du im Browser ein Administrator-Konto an. Danach ist das Dashboard nur nach der Anmeldung erreichbar.
 
 - **Administrator**: darf alles bearbeiten und Benutzer verwalten (Benutzermenü oben rechts).
-- **Nur lesen**: sieht das Dashboard, kann aber nichts ändern.
+- **Nur lesen**: darf das eigene Dashboard bearbeiten, in IPAM, DHCP und DNS aber nichts ändern.
+
+**Dashboard pro Benutzer:** Jeder hat sein eigenes Dashboard (Gruppen, Services, Reihenfolge, Titel). Neue Benutzer starten leer; das bisherige Dashboard gehört dem ersten Administrator. Über _Von anderem Benutzer kopieren_ (Benutzermenü oder Startseite) wählst du per Checkbox Gruppen und Services aus dem Dashboard eines anderen Benutzers; sie werden als unabhängige Kopie übernommen, Gruppen gleichen Namens ergänzt, gleichnamige Services übersprungen. Wer dieselbe Adresse mehrfach hat, wird nur einmal geprüft. IPAM, DNS und DHCP sind für alle gleich.
 
 Passwörter werden mit scrypt gespeichert, Sitzungen laufen 30 Tage und verlängern sich bei Nutzung. Nach zehn Fehlversuchen in 15 Minuten wird die Anmeldung für diesen Benutzernamen und diese IP kurz gesperrt. Hinter einem Reverse-Proxy mit HTTPS wird das Cookie automatisch als `Secure` gesetzt, wenn der Proxy `X-Forwarded-Proto` mitsendet.
 
@@ -125,7 +127,7 @@ Ohne Icon zeigt das Dashboard farbige Initialen.
 
 ## Export und Import
 
-Im Benutzermenü (nur Admins) lässt sich die Konfiguration als YAML herunterladen und wieder einlesen. Vor dem Import zeigt eine Vorschau, was angelegt, aktualisiert oder entfernt wird.
+Im Benutzermenü lässt sich das eigene Dashboard als YAML herunterladen und wieder einlesen. Vor dem Import zeigt eine Vorschau, was angelegt, aktualisiert oder entfernt wird.
 
 - **Zusammenführen:** Gruppen und Services mit gleichem Namen werden aktualisiert, neue ergänzt, nichts gelöscht.
 - **Ersetzen:** alles Bestehende wird durch die Datei ersetzt.

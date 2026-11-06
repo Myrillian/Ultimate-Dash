@@ -1,6 +1,7 @@
 import type { ServerEvent } from '@ultimate-dash/shared';
 
-type Listener = (event: ServerEvent) => void;
+/** `userId` ist gesetzt, wenn das Ereignis nur einen Benutzer betrifft (z. B. dessen Dashboard). */
+type Listener = (event: ServerEvent, userId?: number) => void;
 
 /** Verteilt Server-Ereignisse an alle verbundenen Browser (Server-Sent Events). */
 export class EventHub {
@@ -11,8 +12,8 @@ export class EventHub {
     return () => this.listeners.delete(listener);
   }
 
-  publish(event: ServerEvent): void {
-    for (const listener of this.listeners) listener(event);
+  publish(event: ServerEvent, userId?: number): void {
+    for (const listener of this.listeners) listener(event, userId);
   }
 
   get size(): number {

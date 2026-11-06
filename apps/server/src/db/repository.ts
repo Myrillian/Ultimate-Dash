@@ -1,6 +1,9 @@
-import { asc, eq, inArray, max, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, max, ne, sql } from 'drizzle-orm';
 import type {
   ConfigFile,
+  CopyDashboardInput,
+  CopySummary,
+  DashboardSource,
   DashboardData,
   ImportMode,
   ImportSummary,
@@ -12,7 +15,7 @@ import type {
 } from '@ultimate-dash/shared';
 import { groupInput, serviceInput } from '@ultimate-dash/shared';
 import type { Db } from './client.js';
-import { groups, services, settings } from './schema.js';
+import { groups, services, settings, users } from './schema.js';
 
 export class NotFoundError extends Error {
   constructor(what: string) {
@@ -48,10 +51,11 @@ const toService = (row: ServiceRow): Service => ({
 const now = sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`;
 
 export function createRepository(db: Db) {
-  const nextGroupOrder = () =>
+  const nextGroupOrder = (userId: number) =>
     (db
       .select({ value: max(groups.sortOrder) })
       .from(groups)
+      .where(eq(groups.userId, userId))
       .get()?.value ?? -1) + 1;
 
   const nextServiceOrder = (groupId: number) =>
@@ -61,29 +65,71 @@ export function createRepository(db: Db) {
       .where(eq(services.groupId, groupId))
       .get()?.value ?? -1) + 1;
 
-  const requireGroup = (id: number) => {
-    const row = db.select().from(groups).where(eq(groups.id, id)).get();
+  /** Gruppe nur finden, wenn sie dem Benutzer gehört – fremde Gruppen sind „nicht gefunden“. */
+  const requireGroup = (userId: number, id: number) => {
+    const row = db
+      .select()
+      .from(groups)
+      .where(and(eq(groups.id, id), eq(groups.userId, userId)))
+      .get();
     if (!row) throw new NotFoundError('Gruppe');
     return row;
   };
 
+  const titleKey = (userId: number) => `title:${userId}`;
+
+  /**
+   * Altbestand ohne Besitzer (Dashboard stammt aus der Zeit vor den Benutzern und es gab bei der
+   * Migration noch keinen Admin) gehört dem ältesten Admin.
+   */
+  const adoptOrphans = (userId: number) => {
+    const orphans = db.select({ id: groups.id }).from(groups).where(isNull(groups.userId)).get();
+    if (!orphans) return;
+    const firstAdmin = db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.role, 'admin'))
+      .orderBy(asc(users.id))
+      .get();
+    if (firstAdmin?.id !== userId) return;
+    db.transaction((tx) => {
+      tx.update(groups).set({ userId }).where(isNull(groups.userId)).run();
+      const legacy = tx.select().from(settings).where(eq(settings.key, 'title')).get();
+      if (legacy) {
+        tx.insert(settings)
+          .values({ key: titleKey(userId), value: legacy.value })
+          .onConflictDoNothing()
+          .run();
+      }
+    });
+  };
+
   return {
-    getTitle(): string {
-      const row = db.select().from(settings).where(eq(settings.key, 'title')).get();
+    getTitle(userId: number): string {
+      const row = db
+        .select()
+        .from(settings)
+        .where(eq(settings.key, titleKey(userId)))
+        .get();
       return typeof row?.value === 'string' ? row.value : 'Ultimate Dash';
     },
 
-    getDashboard(): DashboardData {
+    getDashboard(userId: number): DashboardData {
+      adoptOrphans(userId);
       const groupRows = db
         .select()
         .from(groups)
+        .where(eq(groups.userId, userId))
         .orderBy(asc(groups.sortOrder), asc(groups.id))
         .all();
       const serviceRows = db
-        .select()
+        .select({ service: services })
         .from(services)
+        .innerJoin(groups, eq(services.groupId, groups.id))
+        .where(eq(groups.userId, userId))
         .orderBy(asc(services.sortOrder), asc(services.id))
-        .all();
+        .all()
+        .map((row) => row.service);
       const byGroup = new Map<number, Service[]>();
       for (const row of serviceRows) {
         const list = byGroup.get(row.groupId) ?? [];
@@ -91,33 +137,49 @@ export function createRepository(db: Db) {
         byGroup.set(row.groupId, list);
       }
       return {
-        title: this.getTitle(),
+        title: this.getTitle(userId),
         groups: groupRows.map((row) => ({ ...toGroup(row), services: byGroup.get(row.id) ?? [] })),
       };
     },
 
-    listServices(): Service[] {
+    /** Alle Services aller Benutzer (für die Statusprüfung). */
+    listAllServices(): Service[] {
       return db.select().from(services).all().map(toService);
     },
 
-    getService(id: number): Service {
-      const row = db.select().from(services).where(eq(services.id, id)).get();
+    listServices(userId: number): Service[] {
+      return db
+        .select({ service: services })
+        .from(services)
+        .innerJoin(groups, eq(services.groupId, groups.id))
+        .where(eq(groups.userId, userId))
+        .all()
+        .map((row) => toService(row.service));
+    },
+
+    getService(userId: number, id: number): Service {
+      const row = db
+        .select({ service: services })
+        .from(services)
+        .innerJoin(groups, eq(services.groupId, groups.id))
+        .where(and(eq(services.id, id), eq(groups.userId, userId)))
+        .get()?.service;
       if (!row) throw new NotFoundError('Service');
       return toService(row);
     },
 
-    createGroup(input: GroupInput): Group {
+    createGroup(userId: number, input: GroupInput): Group {
       const data = groupInput.parse(input);
       const row = db
         .insert(groups)
-        .values({ ...data, sortOrder: nextGroupOrder() })
+        .values({ ...data, userId, sortOrder: nextGroupOrder(userId) })
         .returning()
         .get();
       return toGroup(row);
     },
 
-    updateGroup(id: number, input: GroupInput): Group {
-      requireGroup(id);
+    updateGroup(userId: number, id: number, input: GroupInput): Group {
+      requireGroup(userId, id);
       const data = groupInput.parse(input);
       const row = db
         .update(groups)
@@ -128,14 +190,18 @@ export function createRepository(db: Db) {
       return toGroup(row!);
     },
 
-    deleteGroup(id: number): void {
-      requireGroup(id);
+    deleteGroup(userId: number, id: number): void {
+      requireGroup(userId, id);
       db.delete(groups).where(eq(groups.id, id)).run();
     },
 
-    reorderGroups(ids: number[]): void {
+    reorderGroups(userId: number, ids: number[]): void {
       db.transaction((tx) => {
-        const existing = tx.select({ id: groups.id }).from(groups).all();
+        const existing = tx
+          .select({ id: groups.id })
+          .from(groups)
+          .where(eq(groups.userId, userId))
+          .all();
         assertSameIds(
           existing.map((row) => row.id),
           ids,
@@ -146,9 +212,9 @@ export function createRepository(db: Db) {
       });
     },
 
-    createService(input: ServiceInput): Service {
+    createService(userId: number, input: ServiceInput): Service {
       const data = serviceInput.parse(input);
-      requireGroup(data.groupId);
+      requireGroup(userId, data.groupId);
       const row = db
         .insert(services)
         .values({ ...data, sortOrder: nextServiceOrder(data.groupId) })
@@ -157,10 +223,10 @@ export function createRepository(db: Db) {
       return toService(row);
     },
 
-    updateService(id: number, input: ServiceInput): Service {
-      const current = this.getService(id);
+    updateService(userId: number, id: number, input: ServiceInput): Service {
+      const current = this.getService(userId, id);
       const data = serviceInput.parse(input);
-      requireGroup(data.groupId);
+      requireGroup(userId, data.groupId);
       const movedGroup = data.groupId !== current.groupId;
       const row = db
         .update(services)
@@ -175,14 +241,14 @@ export function createRepository(db: Db) {
       return toService(row!);
     },
 
-    deleteService(id: number): void {
-      this.getService(id);
+    deleteService(userId: number, id: number): void {
+      this.getService(userId, id);
       db.delete(services).where(eq(services.id, id)).run();
     },
 
     /** Aktueller Stand als YAML-taugliches Objekt; Standardwerte werden weggelassen. */
-    exportConfig(): ConfigFile {
-      const dashboard = this.getDashboard();
+    exportConfig(userId: number): ConfigFile {
+      const dashboard = this.getDashboard(userId);
       return {
         version: 1,
         title: dashboard.title,
@@ -209,7 +275,13 @@ export function createRepository(db: Db) {
      * replace: alles ersetzen. merge: Gruppen per Name, Services per Name innerhalb der Gruppe
      * abgleichen (ohne Groß-/Kleinschreibung), Unbekanntes anhängen, nichts löschen.
      */
-    importConfig(file: ParsedConfigFile, mode: ImportMode, dryRun = false): ImportSummary {
+    importConfig(
+      userId: number,
+      file: ParsedConfigFile,
+      mode: ImportMode,
+      dryRun = false,
+    ): ImportSummary {
+      adoptOrphans(userId);
       const summary: ImportSummary = {
         groupsCreated: 0,
         groupsUpdated: 0,
@@ -222,31 +294,39 @@ export function createRepository(db: Db) {
       const key = (value: string) => value.trim().toLocaleLowerCase('de');
       try {
         db.transaction((tx) => {
-          if (file.title !== undefined && file.title !== this.getTitle()) {
+          if (file.title !== undefined && file.title !== this.getTitle(userId)) {
             summary.titleChanged = true;
             tx.insert(settings)
-              .values({ key: 'title', value: file.title })
+              .values({ key: titleKey(userId), value: file.title })
               .onConflictDoUpdate({ target: settings.key, set: { value: file.title } })
               .run();
           }
           if (mode === 'replace') {
-            summary.groupsRemoved = tx.select({ id: groups.id }).from(groups).all().length;
-            summary.servicesRemoved = tx.select({ id: services.id }).from(services).all().length;
-            tx.delete(services).run();
-            tx.delete(groups).run();
+            const own = tx
+              .select({ id: groups.id })
+              .from(groups)
+              .where(eq(groups.userId, userId))
+              .all()
+              .map((row) => row.id);
+            summary.groupsRemoved = own.length;
+            if (own.length > 0) {
+              summary.servicesRemoved = tx
+                .select({ id: services.id })
+                .from(services)
+                .where(inArray(services.groupId, own))
+                .all().length;
+              tx.delete(groups).where(inArray(groups.id, own)).run();
+            }
           }
           const existingGroups = new Map(
             tx
               .select()
               .from(groups)
+              .where(eq(groups.userId, userId))
               .all()
               .map((row) => [key(row.name), row]),
           );
-          let groupOrder =
-            (tx
-              .select({ value: max(groups.sortOrder) })
-              .from(groups)
-              .get()?.value ?? -1) + 1;
+          let groupOrder = nextGroupOrder(userId);
 
           for (const entry of file.groups) {
             const { services: entries, ...groupData } = entry;
@@ -260,7 +340,7 @@ export function createRepository(db: Db) {
             } else {
               groupRow = tx
                 .insert(groups)
-                .values({ ...groupData, sortOrder: groupOrder++ })
+                .values({ ...groupData, userId, sortOrder: groupOrder++ })
                 .returning()
                 .get();
               existingGroups.set(key(groupData.name), groupRow);
@@ -309,15 +389,148 @@ export function createRepository(db: Db) {
       return summary;
     },
 
-    /** Setzt Reihenfolge (und ggf. Gruppe) der übergebenen Services. */
-    arrangeServices(groupId: number, ids: number[]): void {
+    /** Dashboards der anderen Benutzer als Vorlage zum Kopieren (nur Benutzer mit Inhalt). */
+    listSources(userId: number): DashboardSource[] {
+      const owners = db
+        .select({ id: users.id, username: users.username })
+        .from(users)
+        .where(ne(users.id, userId))
+        .orderBy(asc(users.username))
+        .all();
+      const result: DashboardSource[] = [];
+      for (const owner of owners) {
+        const dashboard = this.getDashboard(owner.id);
+        if (dashboard.groups.length === 0) continue;
+        result.push({
+          userId: owner.id,
+          username: owner.username,
+          groups: dashboard.groups.map((g) => ({
+            id: g.id,
+            name: g.name,
+            icon: g.icon,
+            services: g.services.map((s) => ({
+              id: s.id,
+              name: s.name,
+              url: s.url,
+              icon: s.icon,
+            })),
+          })),
+        });
+      }
+      return result;
+    },
+
+    /**
+     * Kopiert ausgewählte Gruppen/Services eines anderen Benutzers in das eigene Dashboard.
+     * Unabhängige Kopien; Gruppen gleichen Namens werden ergänzt, gleichnamige Services übersprungen.
+     */
+    copyFrom(userId: number, input: CopyDashboardInput): CopySummary {
+      const summary: CopySummary = {
+        groupsCreated: 0,
+        groupsExtended: 0,
+        servicesCreated: 0,
+        servicesSkipped: 0,
+      };
+      if (input.sourceUserId === userId) {
+        throw new ValidationError('Das eigene Dashboard kann nicht in sich selbst kopiert werden');
+      }
+      const key = (value: string) => value.trim().toLocaleLowerCase('de');
       db.transaction((tx) => {
-        const target = tx.select().from(groups).where(eq(groups.id, groupId)).get();
+        const own = new Map(
+          tx
+            .select()
+            .from(groups)
+            .where(eq(groups.userId, userId))
+            .all()
+            .map((row) => [key(row.name), row]),
+        );
+        let groupOrder = nextGroupOrder(userId);
+        for (const pick of input.groups) {
+          const source = tx
+            .select()
+            .from(groups)
+            .where(and(eq(groups.id, pick.groupId), eq(groups.userId, input.sourceUserId)))
+            .get();
+          if (!source) throw new NotFoundError('Gruppe');
+          let target = own.get(key(source.name));
+          if (target) {
+            summary.groupsExtended++;
+          } else {
+            target = tx
+              .insert(groups)
+              .values({
+                userId,
+                name: source.name,
+                icon: source.icon,
+                collapsed: source.collapsed,
+                sortOrder: groupOrder++,
+              })
+              .returning()
+              .get();
+            own.set(key(source.name), target);
+            summary.groupsCreated++;
+          }
+          const ids = [...new Set(pick.serviceIds)];
+          const picked =
+            ids.length === 0
+              ? []
+              : tx
+                  .select()
+                  .from(services)
+                  .where(and(inArray(services.id, ids), eq(services.groupId, source.id)))
+                  .orderBy(asc(services.sortOrder), asc(services.id))
+                  .all();
+          if (picked.length !== ids.length) throw new NotFoundError('Service');
+          const names = new Set(
+            tx
+              .select({ name: services.name })
+              .from(services)
+              .where(eq(services.groupId, target.id))
+              .all()
+              .map((row) => key(row.name)),
+          );
+          let serviceOrder = nextServiceOrder(target.id);
+          for (const row of picked) {
+            if (names.has(key(row.name))) {
+              summary.servicesSkipped++;
+              continue;
+            }
+            tx.insert(services)
+              .values({
+                groupId: target.id,
+                name: row.name,
+                url: row.url,
+                description: row.description,
+                icon: row.icon,
+                target: row.target,
+                statusCheck: row.statusCheck,
+                statusUrl: row.statusUrl,
+                tags: row.tags,
+                sortOrder: serviceOrder++,
+              })
+              .run();
+            names.add(key(row.name));
+            summary.servicesCreated++;
+          }
+        }
+      });
+      return summary;
+    },
+
+    /** Setzt Reihenfolge (und ggf. Gruppe) der übergebenen Services. */
+    arrangeServices(userId: number, groupId: number, ids: number[]): void {
+      db.transaction((tx) => {
+        const target = tx
+          .select()
+          .from(groups)
+          .where(and(eq(groups.id, groupId), eq(groups.userId, userId)))
+          .get();
         if (!target) throw new NotFoundError('Gruppe');
         const found = tx
           .select({ id: services.id })
           .from(services)
-          .where(inArray(services.id, ids))
+          .innerJoin(groups, eq(services.groupId, groups.id))
+          .where(and(inArray(services.id, ids), eq(groups.userId, userId)))
           .all();
         if (found.length !== new Set(ids).size) throw new NotFoundError('Service');
         ids.forEach((id, index) => {

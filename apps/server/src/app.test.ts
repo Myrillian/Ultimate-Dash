@@ -157,7 +157,7 @@ describe('API', () => {
       url: `/api/groups/${group.id}`,
     });
     expect(res.statusCode).toBe(204);
-    expect(ctx.repo.listServices()).toHaveLength(0);
+    expect(ctx.repo.listAllServices()).toHaveLength(0);
   });
 
   it('aktualisiert Services', async () => {

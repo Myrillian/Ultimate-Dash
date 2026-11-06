@@ -65,19 +65,28 @@ export class StatusMonitor {
       const active = new Set(all.filter((s) => s.statusCheck).map((s) => s.id));
       for (const id of this.statuses.keys()) if (!active.has(id)) this.statuses.delete(id);
 
-      const queue = all.filter((s) => s.statusCheck);
+      // Mehrere Benutzer (oder Services) mit demselben Ziel werden nur einmal geprüft.
+      const byTarget = new Map<string, Service[]>();
+      for (const service of all) {
+        if (!service.statusCheck) continue;
+        const target = service.statusUrl ?? service.url;
+        const list = byTarget.get(target) ?? [];
+        list.push(service);
+        byTarget.set(target, list);
+      }
+      const queue = [...byTarget.entries()];
       const results: ServiceStatus[] = [];
       const workers = Array.from(
         { length: Math.min(this.options.concurrency ?? 8, queue.length) },
         async () => {
-          for (let service = queue.shift(); service; service = queue.shift()) {
-            const status = await checkUrl(
-              service.id,
-              service.statusUrl ?? service.url,
-              this.options,
-            );
-            this.statuses.set(service.id, status);
-            results.push(status);
+          for (let entry = queue.shift(); entry; entry = queue.shift()) {
+            const [target, sharing] = entry;
+            const status = await checkUrl(sharing[0]!.id, target, this.options);
+            for (const service of sharing) {
+              const own = { ...status, serviceId: service.id };
+              this.statuses.set(service.id, own);
+              results.push(own);
+            }
           }
         },
       );

@@ -4,6 +4,7 @@
   import UiIcon from './UiIcon.svelte';
   import UsersDialog from './UsersDialog.svelte';
   import ImportDialog from './ImportDialog.svelte';
+  import CopyDialog from './CopyDialog.svelte';
   import TechnitiumDialog from './TechnitiumDialog.svelte';
   import { menus } from '$lib/menus.svelte';
 
@@ -94,21 +95,30 @@
               <UiIcon name="server" size={16} /> Technitium DNS
             </button>
           </li>
-          <li class="mt-1 border-t border-line pt-1">
-            <a href="/api/config/export" download class="menu-item" onclick={() => close()}>
-              <UiIcon name="download" size={16} /> Konfiguration exportieren
-            </a>
-          </li>
-          <li>
-            <button
-              type="button"
-              class="menu-item"
-              onclick={() => choose(() => (menus.importOpen = true))}
-            >
-              <UiIcon name="upload" size={16} /> Konfiguration importieren
-            </button>
-          </li>
         {/if}
+        <li class="mt-1 border-t border-line pt-1">
+          <button
+            type="button"
+            class="menu-item"
+            onclick={() => choose(() => (menus.copyOpen = true))}
+          >
+            <UiIcon name="copy" size={16} /> Von anderem Benutzer kopieren
+          </button>
+        </li>
+        <li>
+          <a href="/api/config/export" download class="menu-item" onclick={() => close()}>
+            <UiIcon name="download" size={16} /> Mein Dashboard exportieren
+          </a>
+        </li>
+        <li>
+          <button
+            type="button"
+            class="menu-item"
+            onclick={() => choose(() => (menus.importOpen = true))}
+          >
+            <UiIcon name="upload" size={16} /> Mein Dashboard importieren
+          </button>
+        </li>
         <li class="mt-1 border-t border-line pt-1">
           <button type="button" class="menu-item" onclick={() => choose(() => void auth.logout())}>
             <UiIcon name="logout" size={16} /> Abmelden
@@ -120,9 +130,10 @@
 </div>
 
 <PasswordDialog open={passwordOpen} onclose={() => (passwordOpen = false)} />
+<ImportDialog open={menus.importOpen} onclose={() => (menus.importOpen = false)} />
+<CopyDialog open={menus.copyOpen} onclose={() => (menus.copyOpen = false)} />
 {#if auth.isAdmin}
   <UsersDialog open={usersOpen} onclose={() => (usersOpen = false)} />
-  <ImportDialog open={menus.importOpen} onclose={() => (menus.importOpen = false)} />
   <TechnitiumDialog open={menus.technitiumOpen} onclose={() => (menus.technitiumOpen = false)} />
 {/if}
 

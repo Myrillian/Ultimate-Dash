@@ -13,14 +13,11 @@ export async function configRoutes(
   { repo, events }: { repo: Repository; events: EventHub },
 ) {
   app.get('/config/export', async (request, reply) => {
-    // Enthält interne Adressen; Nur-lesen-Benutzer sehen zwar die Links, bekommen aber keine Datei.
-    if (request.user!.role !== 'admin')
-      return reply.code(403).send({ error: 'Dafür sind Admin-Rechte nötig' });
     const date = new Date().toISOString().slice(0, 10);
     return reply
       .header('content-type', 'application/yaml; charset=utf-8')
       .header('content-disposition', `attachment; filename="ultimate-dash-${date}.yaml"`)
-      .send(HEADER + stringify(repo.exportConfig(), { lineWidth: 0 }));
+      .send(HEADER + stringify(repo.exportConfig(request.user!.id), { lineWidth: 0 }));
   });
 
   app.post('/config/import', async (request) => {
@@ -38,9 +35,9 @@ export async function configRoutes(
       throw error;
     }
     const file = configFile.parse(data);
-    const summary = repo.importConfig(file, mode, dryRun);
+    const summary = repo.importConfig(request.user!.id, file, mode, dryRun);
     if (!dryRun) {
-      events.publish({ type: 'dashboard-changed' });
+      events.publish({ type: 'dashboard-changed' }, request.user!.id);
       request.log.info({ mode, ...summary }, 'Konfiguration importiert');
     }
     return summary;
