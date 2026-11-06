@@ -3,3 +3,4 @@ export * from './status.js';
 export * from './auth.js';
 export * from './icons.js';
 export * from './config-file.js';
+export * from './technitium.js';

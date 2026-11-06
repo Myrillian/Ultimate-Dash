@@ -23,6 +23,8 @@
   import ServiceForm from '$lib/components/ServiceForm.svelte';
   import UiIcon from '$lib/components/UiIcon.svelte';
   import UserMenu from '$lib/components/UserMenu.svelte';
+  import DnsPanel from '$lib/components/DnsPanel.svelte';
+  import { menus } from '$lib/menus.svelte';
 
   let query = $state('');
   let activeIndex = $state(0);
@@ -236,7 +238,10 @@
     </div>
   </header>
 
-  <main class="flex-1">
+  <main class="grid flex-1 content-start gap-8">
+    {#if dashboard.data && !searching}
+      <DnsPanel onconnect={() => (menus.technitiumOpen = true)} />
+    {/if}
     {#if dashboard.error && !dashboard.data}
       <div
         class="mx-auto max-w-md rounded-2xl border border-down/40 bg-elevated p-6 text-center"

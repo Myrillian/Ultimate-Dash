@@ -78,3 +78,21 @@ export const sessions = sqliteTable(
   },
   (table) => [index('sessions_user_idx').on(table.userId)],
 );
+
+/** Protokoll aller Änderungen an Fremdsystemen (Technitium usw.), wer wann was getan hat. */
+export const auditLog = sqliteTable(
+  'audit_log',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    at: timestamps.createdAt,
+    userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+    /** Name zum Zeitpunkt der Aktion, bleibt auch nach Löschen des Benutzers lesbar. */
+    username: text('username'),
+    action: text('action').notNull(),
+    target: text('target'),
+    details: text('details', { mode: 'json' }).$type<Record<string, unknown>>(),
+    ok: integer('ok', { mode: 'boolean' }).notNull(),
+    error: text('error'),
+  },
+  (table) => [index('audit_log_at_idx').on(table.at)],
+);

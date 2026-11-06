@@ -9,7 +9,8 @@
     "start": "node dist/main.js",
     "check": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "fake:technitium": "tsx src/technitium/fake-main.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

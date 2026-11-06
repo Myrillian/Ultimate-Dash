@@ -17,6 +17,14 @@
   --unknown: #9aa1b2;
   --focus: #4f46e5;
   --shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 3px rgb(16 24 40 / 0.08);
+  /* Diagrammfarben: je Bedeutung fest, mit validate_palette.js für hell und dunkel geprüft. */
+  --chart-queries: #2a78d6;
+  --chart-blocked: #eb6834;
+  --chart-cached: #1baf7a;
+  --chart-authoritative: #eda100;
+  --chart-recursive: #6250d6;
+  --chart-dropped: #9aa1b2;
+  --chart-grid: #e9ebf1;
 }
 
 [data-theme='dark'] {
@@ -33,6 +41,13 @@
   --unknown: #6b7280;
   --focus: #a5b4fc;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  --chart-queries: #3987e5;
+  --chart-blocked: #d95926;
+  --chart-cached: #199e70;
+  --chart-authoritative: #c98500;
+  --chart-recursive: #9085e9;
+  --chart-dropped: #6b7280;
+  --chart-grid: #232937;
 }
 
 @theme inline {

@@ -58,14 +58,16 @@ pnpm format       # Formatierung
 
 ### Umgebungsvariablen
 
-| Variable                  | Standard | Bedeutung                        |
-| ------------------------- | -------- | -------------------------------- |
-| `PORT`                    | `3000`   | HTTP-Port                        |
-| `DATA_DIR`                | `./data` | Ordner für die SQLite-Datenbank  |
-| `STATUS_INTERVAL_SECONDS` | `60`     | Abstand der Statusprüfungen      |
-| `STATUS_TIMEOUT_MS`       | `5000`   | Zeitlimit pro Statusprüfung      |
-| `LOG_LEVEL`               | `info`   | `debug`, `info`, `warn`, `error` |
-| `LOG_REQUESTS`            | `false`  | Jede HTTP-Anfrage loggen         |
+| Variable                  | Standard | Bedeutung                              |
+| ------------------------- | -------- | -------------------------------------- |
+| `PORT`                    | `3000`   | HTTP-Port                              |
+| `DATA_DIR`                | `./data` | Ordner für die SQLite-Datenbank        |
+| `STATUS_INTERVAL_SECONDS` | `60`     | Abstand der Statusprüfungen            |
+| `STATUS_TIMEOUT_MS`       | `5000`   | Zeitlimit pro Statusprüfung            |
+| `LOG_LEVEL`               | `info`   | `debug`, `info`, `warn`, `error`       |
+| `LOG_REQUESTS`            | `false`  | Jede HTTP-Anfrage loggen               |
+| `TECHNITIUM_URL`          | –        | Feste Technitium-Adresse (siehe unten) |
+| `TECHNITIUM_TOKEN`        | –        | API-Token dazu                         |
 
 ## Anmeldung und Benutzer
 
@@ -145,3 +147,13 @@ groups:
 ```
 
 Weitere Felder pro Service: `description`, `target` (`_blank` oder `_self`), `statusUrl`; pro Gruppe: `icon`, `collapsed`. Benutzer und Passwörter sind nicht Teil der Datei.
+
+## Technitium DNS
+
+Ist Technitium verbunden, zeigt das Dashboard oben einen DNS-Bereich: Anfragen, Geblockt, Cache-Anteil und Clients, den Verlauf (auch als Tabelle), woher die Antworten kamen, sowie Top-Domains, geblockte Domains und Top-Clients. Der Zeitraum (1 Stunde bis 1 Jahr) gilt für alles darin. Admins können das Blocking für 5, 15 oder 60 Minuten pausieren, dauerhaft aus- und wieder einschalten und die Blocklisten sofort aktualisieren. Jede dieser Änderungen landet mit Benutzer und Zeitpunkt im Änderungsprotokoll.
+
+**Einrichten:** Benutzermenü › _Technitium DNS_, Adresse der Weboberfläche (z. B. `http://10.10.0.53:5380`) und ein API-Token eintragen. Das Token erzeugst du in Technitium unter _Administration › Sessions › Create Token_, am besten für einen eigenen Benutzer. Für die Statistik genügt die Berechtigung _Dashboard: View_, für das Blocking zusätzlich _Settings: Modify_. Gespeichert wird nur, wenn die Verbindung klappt.
+
+Das Token bleibt auf dem Server (in der SQLite-Datei) und wird nie an den Browser geschickt. Alle Anfragen an Technitium laufen über das Backend. Wer die Verbindung lieber fest vorgibt, setzt `TECHNITIUM_URL` und `TECHNITIUM_TOKEN` (optional `TECHNITIUM_TLS_INSECURE=true` bei selbst signiertem Zertifikat); dann ist sie in der Oberfläche nur lesbar.
+
+Zum Ausprobieren ohne echten Server gibt es eine Simulation: `pnpm --filter @ultimate-dash/server fake:technitium` startet sie auf Port 5380 mit dem Token `dev-token`.

@@ -15,6 +15,13 @@ import type {
   Service,
   ServiceInput,
   ServiceStatus,
+  AuditEntry,
+  BlockingAction,
+  DnsSummary,
+  StatsRange,
+  TechnitiumSettings,
+  TechnitiumSettingsInput,
+  TechnitiumTestResult,
 } from '@ultimate-dash/shared';
 
 export class ApiError extends Error {
@@ -22,6 +29,8 @@ export class ApiError extends Error {
     message: string,
     readonly status: number,
     readonly issues: { path: (string | number)[]; message: string }[] = [],
+    /** Maschinenlesbarer Fehlercode, z. B. `not-configured` bei Technitium */
+    readonly code?: string,
   ) {
     super(message);
   }
@@ -48,7 +57,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new ApiError(data.error ?? `Fehler ${response.status}`, response.status, data.issues);
+    throw new ApiError(
+      data.error ?? `Fehler ${response.status}`,
+      response.status,
+      data.issues,
+      data.code,
+    );
   }
   return data as T;
 }
@@ -80,4 +94,15 @@ export const api = {
   deleteService: (id: number) => request<void>('DELETE', `/services/${id}`),
   arrangeServices: (groupId: number, ids: number[]) =>
     request<void>('PUT', '/services/arrange', { groupId, ids }),
+
+  technitiumSettings: () => request<TechnitiumSettings>('GET', '/technitium/settings'),
+  saveTechnitium: (input: TechnitiumSettingsInput) =>
+    request<TechnitiumTestResult>('PUT', '/technitium/settings', input),
+  testTechnitium: (input: TechnitiumSettingsInput) =>
+    request<TechnitiumTestResult>('POST', '/technitium/test', input),
+  disconnectTechnitium: () => request<void>('DELETE', '/technitium/settings'),
+  dnsSummary: (range: StatsRange) =>
+    request<DnsSummary>('GET', `/technitium/summary?range=${range}`),
+  blocking: (action: BlockingAction) => request<void>('POST', '/technitium/blocking', action),
+  audit: () => request<AuditEntry[]>('GET', '/audit'),
 };
