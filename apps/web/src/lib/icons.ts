@@ -9,24 +9,26 @@
 export type ResolvedIcon =
   { kind: 'image'; src: string } | { kind: 'initials'; text: string; hue: number };
 
+const DI_BASE = 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons';
+const SH_BASE = 'https://cdn.jsdelivr.net/gh/selfhst/icons';
+
+/** `proxmox` → svg/proxmox.svg, `foo.png` → png/foo.png (Icons, die es nur als Bitmap gibt). */
+function iconFileUrl(base: string, ref: string): string {
+  const match = /^(.+)\.(png|webp|svg)$/.exec(ref);
+  const [name, ext] = match ? [match[1]!, match[2]!] : [ref, 'svg'];
+  return `${base}/${ext}/${encodeURIComponent(name)}.${ext}`;
+}
+
 const ICONIFY = /^([a-z0-9]+(?:-[a-z0-9]+)*):([a-z0-9]+(?:-[a-z0-9]+)*)$/;
 
 export function resolveIcon(icon: string | null | undefined, name: string): ResolvedIcon {
   const value = icon?.trim();
   if (value) {
     if (/^https?:\/\//i.test(value) || value.startsWith('/')) return { kind: 'image', src: value };
-    if (value.startsWith('di:')) {
-      return {
-        kind: 'image',
-        src: `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${encodeURIComponent(value.slice(3))}.svg`,
-      };
-    }
-    if (value.startsWith('sh:')) {
-      return {
-        kind: 'image',
-        src: `https://cdn.jsdelivr.net/gh/selfhst/icons/svg/${encodeURIComponent(value.slice(3))}.svg`,
-      };
-    }
+    if (value.startsWith('di:'))
+      return { kind: 'image', src: iconFileUrl(DI_BASE, value.slice(3)) };
+    if (value.startsWith('sh:'))
+      return { kind: 'image', src: iconFileUrl(SH_BASE, value.slice(3)) };
     const match = ICONIFY.exec(value);
     if (match)
       return { kind: 'image', src: `https://api.iconify.design/${match[1]}/${match[2]}.svg` };

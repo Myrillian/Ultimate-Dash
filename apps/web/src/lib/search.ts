@@ -6,7 +6,7 @@ export interface SearchHit {
   score: number;
 }
 
-const normalize = (value: string) =>
+export const normalize = (value: string) =>
   value
     .toLocaleLowerCase('de')
     .normalize('NFD')

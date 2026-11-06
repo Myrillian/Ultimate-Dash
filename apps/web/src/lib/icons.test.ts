@@ -17,6 +17,9 @@ describe('resolveIcon', () => {
     expect(resolveIcon('sh:technitium', 'T')).toMatchObject({
       src: expect.stringContaining('selfhst/icons/svg/technitium.svg'),
     });
+    expect(resolveIcon('di:nur-png.png', 'N')).toMatchObject({
+      src: expect.stringContaining('dashboard-icons/png/nur-png.png'),
+    });
     expect(resolveIcon('mdi:server-network', 'S')).toEqual({
       kind: 'image',
       src: 'https://api.iconify.design/mdi/server-network.svg',

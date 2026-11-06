@@ -1,3 +1,5 @@
 export * from './schemas.js';
 export * from './status.js';
 export * from './auth.js';
+export * from './icons.js';
+export * from './config-file.js';

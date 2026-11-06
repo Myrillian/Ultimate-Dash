@@ -7,6 +7,9 @@ import type {
   UserCreateInput,
   UserUpdateInput,
   DashboardData,
+  IconCatalog,
+  ImportRequest,
+  ImportSummary,
   Group,
   GroupInput,
   Service,
@@ -62,6 +65,10 @@ export const api = {
   deleteUser: (id: number) => request<void>('DELETE', `/users/${id}`),
 
   dashboard: () => request<DashboardData>('GET', '/dashboard'),
+  importConfig: (input: ImportRequest) => request<ImportSummary>('POST', '/config/import', input),
+  iconCatalog: () => request<IconCatalog>('GET', '/icons'),
+  searchIconify: (q: string) =>
+    request<{ icons: string[] }>('GET', `/icons/iconify?q=${encodeURIComponent(q)}`),
   status: () => request<ServiceStatus[]>('GET', '/status'),
   createGroup: (input: GroupInput) => request<Group>('POST', '/groups', input),
   updateGroup: (id: number, input: GroupInput) => request<Group>('PUT', `/groups/${id}`, input),

@@ -108,3 +108,10 @@ dialog::backdrop {
       focus:border-accent focus:outline-none aria-[invalid=true]:border-down;
   }
 }
+
+/* Drag-and-drop: Zielbereich hervorheben */
+.drop-target {
+  outline: 2px dashed color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: 4px;
+  border-radius: 0.75rem;
+}
