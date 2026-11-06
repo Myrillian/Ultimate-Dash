@@ -40,7 +40,9 @@ docs/           Planung und Entscheidungen
 docker compose up -d --build
 ```
 
-Danach läuft das Dashboard auf http://localhost:3000. Daten liegen in `./data`.
+Danach läuft das Dashboard auf `http://<IP des Hosts>:3000`. Daten liegen in `./data`; die Rechte des Ordners setzt der Container beim Start selbst.
+
+Voraussetzung ist Docker mit dem Compose-Plugin. Meldet `docker compose` „unknown shorthand flag: 'd'“, fehlt das Plugin (häufig bei Docker aus dem Paket `docker.io`). Unter Ubuntu hilft `apt install docker-compose-v2`, sonst die [offizielle Anleitung](https://docs.docker.com/compose/install/linux/).
 
 ### Entwicklung
 
