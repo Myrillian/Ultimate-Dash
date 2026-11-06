@@ -8,3 +8,4 @@ export * from './dns.js';
 export * from './ip.js';
 export * from './dhcp.js';
 export * from './ipam.js';
+export * from './views.js';

@@ -25,6 +25,7 @@ import { IpamScanner } from './ipam/scanner.js';
 import { IpamSyncService } from './ipam/sync.js';
 import { IpamUsageService } from './ipam/usage.js';
 import { ipamRoutes } from './routes/ipam.js';
+import { viewRoutes } from './routes/views.js';
 import { technitiumRoutes } from './routes/technitium.js';
 import { TechnitiumError } from './technitium/client.js';
 import { DhcpService } from './technitium/dhcp.js';
@@ -95,6 +96,7 @@ export async function buildApp(
     oidc: config.oidc ? createOidc(config.oidc, authStore) : null,
   });
   await app.register(apiRoutes, { prefix: '/api', repo, events, monitor });
+  await app.register(viewRoutes, { prefix: '/api', db });
   const icons =
     options.icons ??
     new IconCatalogService({

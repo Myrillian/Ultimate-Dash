@@ -50,6 +50,13 @@
       "when": 1793964274605,
       "tag": "0006_dashboard_pro_benutzer",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1793972442807,
+      "tag": "0007_gespeicherte_ansichten",
+      "breakpoints": true
     }
   ]
 }

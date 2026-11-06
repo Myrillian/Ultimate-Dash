@@ -26,12 +26,15 @@ const PUBLIC_ROUTES = new Set([
 const SELF_SERVICE_ROUTES = new Set(['POST /api/auth/logout', 'POST /api/auth/password']);
 
 /**
- * Das Dashboard gehört jedem Benutzer selbst (Gruppen, Services, Import, Kopieren);
+ * Das Dashboard und die gespeicherten Listenansichten gehören jedem Benutzer selbst
+ * (Gruppen, Services, Import, Kopieren, Ansichten);
  * die Routen arbeiten ausschließlich auf den Daten des angemeldeten Benutzers.
  */
 const isOwnDashboardRoute = (route: string) =>
   /^(POST|PUT|DELETE) \/api\/(groups|services)(\/|$)/.test(route) ||
   route === 'POST /api/dashboard/copy' ||
+  route === 'PUT /api/views' ||
+  route === 'DELETE /api/views/:id' ||
   route === 'POST /api/config/import';
 
 const isWrite = (method: string) => !['GET', 'HEAD', 'OPTIONS'].includes(method);
