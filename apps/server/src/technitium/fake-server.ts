@@ -13,6 +13,8 @@ export interface FakeTechnitium {
     temporaryDisableBlockingTill: string | null;
     listUpdates: number;
   };
+  /** DHCP-Stand; Tests dürfen ihn lesen und verändern */
+  dhcp: { scopes: FakeScope[]; leases: FakeLease[] };
   /** Records je Zone; Tests dürfen sie lesen und verändern */
   records: Record<string, FakeRecord[]>;
   requests: { path: string; params: Record<string, string>; authorization?: string }[];
@@ -29,6 +31,88 @@ export interface FakeRecord {
   comments?: string;
   rData: Record<string, string | number>;
 }
+
+export interface FakeScope {
+  name: string;
+  enabled: boolean;
+  startingAddress: string;
+  endingAddress: string;
+  subnetMask: string;
+  routerAddress: string;
+  domainName: string;
+  exclusions: { startingAddress: string; endingAddress: string }[];
+  reservedLeases: {
+    hostName: string | null;
+    hardwareAddress: string;
+    address: string;
+    comments: string | null;
+  }[];
+}
+
+export interface FakeLease {
+  scope: string;
+  type: 'Dynamic' | 'Reserved';
+  hardwareAddress: string;
+  address: string;
+  hostName: string | null;
+}
+
+const seedDhcp = (): FakeTechnitium['dhcp'] => ({
+  scopes: [
+    {
+      name: 'LAN',
+      enabled: true,
+      startingAddress: '10.10.10.1',
+      endingAddress: '10.10.10.254',
+      subnetMask: '255.255.255.0',
+      routerAddress: '10.10.10.1',
+      domainName: 'home.lan',
+      exclusions: [{ startingAddress: '10.10.10.1', endingAddress: '10.10.10.99' }],
+      reservedLeases: [
+        {
+          hostName: 'nas',
+          hardwareAddress: 'AA-BB-CC-00-00-01',
+          address: '10.10.10.20',
+          comments: 'Synology',
+        },
+      ],
+    },
+    {
+      name: 'IoT',
+      enabled: false,
+      startingAddress: '10.10.20.100',
+      endingAddress: '10.10.20.200',
+      subnetMask: '255.255.255.0',
+      routerAddress: '10.10.20.1',
+      domainName: 'iot.home.lan',
+      exclusions: [],
+      reservedLeases: [],
+    },
+  ],
+  leases: [
+    {
+      scope: 'LAN',
+      type: 'Reserved',
+      hardwareAddress: 'AA-BB-CC-00-00-01',
+      address: '10.10.10.20',
+      hostName: 'nas',
+    },
+    {
+      scope: 'LAN',
+      type: 'Dynamic',
+      hardwareAddress: 'AA-BB-CC-00-00-02',
+      address: '10.10.10.101',
+      hostName: 'laptop',
+    },
+    {
+      scope: 'LAN',
+      type: 'Dynamic',
+      hardwareAddress: 'AA-BB-CC-00-00-03',
+      address: '10.10.10.102',
+      hostName: null,
+    },
+  ],
+});
 
 const ZONES = [
   { name: 'home.lan', type: 'Primary', internal: false },
@@ -220,6 +304,7 @@ export async function startFakeTechnitium(port = 0, token = 'test-token'): Promi
     requests: [],
     allowedPaths: null,
     records: seedRecords(),
+    dhcp: seedDhcp(),
   };
   let timer: NodeJS.Timeout | undefined;
 
@@ -286,6 +371,127 @@ export async function startFakeTechnitium(port = 0, token = 'test-token'): Promi
         case 'settings/forceUpdateBlockLists':
           s.listUpdates++;
           return send({ status: 'ok' });
+        case 'dhcp/scopes/list':
+          return send({
+            status: 'ok',
+            response: {
+              scopes: fake.dhcp.scopes.map(
+                ({ name, enabled, startingAddress, endingAddress, subnetMask }) => ({
+                  name,
+                  enabled,
+                  startingAddress,
+                  endingAddress,
+                  subnetMask,
+                  networkAddress: startingAddress.replace(/\.\d+$/, '.0'),
+                }),
+              ),
+            },
+          });
+        case 'dhcp/scopes/get': {
+          const scope = fake.dhcp.scopes.find((x) => x.name === params.name);
+          if (!scope)
+            return send({
+              status: 'error',
+              errorMessage: `DHCP scope was not found: ${params.name}`,
+            });
+          return send({
+            status: 'ok',
+            response: {
+              ...scope,
+              leaseTimeDays: 1,
+              leaseTimeHours: 12,
+              leaseTimeMinutes: 0,
+              dnsServers: ['10.10.10.2'],
+              allowOnlyReservedLeases: false,
+            },
+          });
+        }
+        case 'dhcp/scopes/enable':
+        case 'dhcp/scopes/disable': {
+          const scope = fake.dhcp.scopes.find((x) => x.name === params.name);
+          if (!scope)
+            return send({
+              status: 'error',
+              errorMessage: `DHCP scope was not found: ${params.name}`,
+            });
+          scope.enabled = path.endsWith('enable');
+          return send({ status: 'ok', response: {} });
+        }
+        case 'dhcp/scopes/addReservedLease': {
+          const scope = fake.dhcp.scopes.find((x) => x.name === params.name);
+          if (!scope)
+            return send({
+              status: 'error',
+              errorMessage: `DHCP scope was not found: ${params.name}`,
+            });
+          const mac = params.hardwareAddress!.replace(/:/g, '-').toUpperCase();
+          if (scope.reservedLeases.some((r) => r.hardwareAddress === mac))
+            return send({
+              status: 'error',
+              errorMessage: `Reserved lease already exists for hardware address: ${mac}`,
+            });
+          if (scope.reservedLeases.some((r) => r.address === params.ipAddress))
+            return send({
+              status: 'error',
+              errorMessage: `Reserved lease already exists for address: ${params.ipAddress}`,
+            });
+          scope.reservedLeases.push({
+            hostName: params.hostName ?? null,
+            hardwareAddress: mac,
+            address: params.ipAddress!,
+            comments: params.comments ?? null,
+          });
+          return send({ status: 'ok', response: {} });
+        }
+        case 'dhcp/scopes/removeReservedLease': {
+          const scope = fake.dhcp.scopes.find((x) => x.name === params.name);
+          const mac = params.hardwareAddress?.replace(/:/g, '-').toUpperCase();
+          const index = scope?.reservedLeases.findIndex((r) => r.hardwareAddress === mac) ?? -1;
+          if (!scope || index < 0)
+            return send({ status: 'error', errorMessage: 'The reserved lease does not exists.' });
+          scope.reservedLeases.splice(index, 1);
+          return send({ status: 'ok', response: {} });
+        }
+        case 'dhcp/leases/list':
+          return send({
+            status: 'ok',
+            response: {
+              leases: fake.dhcp.leases.map((l) => ({
+                ...l,
+                clientIdentifier: '1-' + l.hardwareAddress.replace(/-/g, '').toLowerCase(),
+                leaseObtained: '11/06/2026 08:00:00',
+                leaseExpires: '11/07/2026 20:00:00',
+              })),
+            },
+          });
+        case 'dhcp/leases/convertToReserved':
+        case 'dhcp/leases/convertToDynamic':
+        case 'dhcp/leases/remove': {
+          const mac = params.hardwareAddress?.replace(/:/g, '-').toUpperCase();
+          const index = fake.dhcp.leases.findIndex(
+            (l) => l.scope === params.name && l.hardwareAddress === mac,
+          );
+          const lease = fake.dhcp.leases[index];
+          const scope = fake.dhcp.scopes.find((x) => x.name === params.name);
+          if (!lease || !scope)
+            return send({ status: 'error', errorMessage: 'The lease was not found.' });
+          if (path.endsWith('remove')) {
+            fake.dhcp.leases.splice(index, 1);
+            scope.reservedLeases = scope.reservedLeases.filter((r) => r.hardwareAddress !== mac);
+          } else if (path.endsWith('convertToReserved')) {
+            lease.type = 'Reserved';
+            scope.reservedLeases.push({
+              hostName: lease.hostName,
+              hardwareAddress: mac!,
+              address: lease.address,
+              comments: null,
+            });
+          } else {
+            lease.type = 'Dynamic';
+            scope.reservedLeases = scope.reservedLeases.filter((r) => r.hardwareAddress !== mac);
+          }
+          return send({ status: 'ok', response: {} });
+        }
         case 'zones/list':
           return send({
             status: 'ok',

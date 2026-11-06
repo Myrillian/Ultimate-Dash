@@ -10,6 +10,7 @@
   import { toasts } from '$lib/toasts.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import RecordForm from '$lib/components/RecordForm.svelte';
+  import TechNav from '$lib/components/TechNav.svelte';
   import UiIcon from '$lib/components/UiIcon.svelte';
   import UserMenu from '$lib/components/UserMenu.svelte';
 
@@ -128,6 +129,7 @@
     <h1 class="flex items-center gap-2 text-xl font-semibold tracking-tight">
       <UiIcon name="server" size={20} class="text-fg-muted" /> DNS-Zonen und Records
     </h1>
+    <TechNav />
     <div class="ml-auto flex items-center gap-1">
       <button
         type="button"
@@ -250,7 +252,7 @@
             </div>
           {:else}
             <div
-              class="overflow-x-auto rounded-2xl border border-line bg-elevated transition-opacity"
+              class="relative overflow-x-auto rounded-2xl border border-line bg-elevated transition-opacity"
               class:opacity-60={loadingRecords}
             >
               <table class="w-full min-w-[34rem] text-left text-sm">

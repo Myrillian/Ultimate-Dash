@@ -108,7 +108,8 @@ export class TechnitiumService {
     return connection;
   }
 
-  private call<T>(path: string, params?: Record<string, string | number | boolean>) {
+  /** Für DhcpService: ruft einen Technitium-Endpunkt mit der gespeicherten Verbindung auf. */
+  call<T>(path: string, params?: Record<string, string | number | boolean>) {
     return callTechnitium<T>(this.connection(), path, params, this.options.timeoutMs);
   }
 
@@ -329,7 +330,7 @@ export class TechnitiumService {
   }
 
   /** Führt eine Änderung aus und protokolliert sie, auch wenn sie fehlschlägt. */
-  private async audited<T>(
+  async audited<T>(
     user: User,
     action: string,
     target: string,

@@ -5,3 +5,5 @@ export * from './icons.js';
 export * from './config-file.js';
 export * from './technitium.js';
 export * from './dns.js';
+export * from './ip.js';
+export * from './dhcp.js';
