@@ -174,7 +174,7 @@
     }),
   );
 
-  const statusRank = { online: 0, offline: 1, unchecked: 2 } as const;
+  const statusRank: Record<string, number> = { online: 0, offline: 1, unchecked: 2 };
   const sortValue = (e: (typeof entries)[number], key: string): string | number => {
     switch (key) {
       case 'address':
@@ -184,7 +184,7 @@
       case 'type':
         return typeLabel[e.row.type];
       case 'status':
-        return statusRank[e.status];
+        return statusRank[e.status] ?? 3;
       case 'source':
         return e.sources.join(', ');
       case 'mac':
