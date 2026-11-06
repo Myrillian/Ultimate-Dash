@@ -36,6 +36,13 @@
       "when": 1793955247294,
       "tag": "0004_ipam",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793962091972,
+      "tag": "0005_ipam_scan",
+      "breakpoints": true
     }
   ]
 }

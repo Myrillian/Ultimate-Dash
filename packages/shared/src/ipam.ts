@@ -75,6 +75,8 @@ export const ipamNetworkInput = z.object({
     .nullish()
     .transform((value) => value || null),
   description: optionalText(500),
+  /** Per Ping auf Erreichbarkeit prüfen und unbekannte Geräte entdecken */
+  scan: z.boolean().default(true),
 });
 export type IpamNetworkInput = z.input<typeof ipamNetworkInput>;
 
@@ -126,6 +128,9 @@ export interface IpamNetwork {
   vlanId: number | null;
   gateway: string | null;
   description: string | null;
+  scan: boolean;
+  /** Ende des letzten Ping-Durchlaufs über dieses Netz */
+  lastScanAt: string | null;
 }
 
 export interface IpamCategory {
@@ -152,16 +157,29 @@ export interface IpamData {
 
 /** Woher die Belegung einer Adresse bekannt ist. */
 export interface IpamClaim {
-  source: 'lease' | 'reservation' | 'dns';
+  /** discovered = per Ping gefunden und nirgends sonst bekannt, manual = von Hand bestätigt */
+  source: 'lease' | 'reservation' | 'dns' | 'discovered' | 'manual';
   /** MAC bei Lease/Reservierung */
   mac: string | null;
   name: string | null;
   scope: string | null;
+  /** ID des Eintrags in der Liste der gefundenen Geräte (nur discovered/manual) */
+  hostId: number | null;
 }
+
+/** Wie eine Adresse vergeben ist: per DHCP-Reservierung, dynamischer Lease oder statisch (nur DNS, entdeckt oder von Hand). */
+export type IpamAddressType = 'reservation' | 'lease' | 'static';
 
 export interface IpamAddressUsage {
   address: string;
   claims: IpamClaim[];
+  type: IpamAddressType;
+  /** Antwort auf den letzten Ping; null, solange das Netz noch nicht geprüft wurde */
+  alive: boolean | null;
+  /** Letzte erfolgreiche Antwort (ISO) */
+  lastSeen: string | null;
+  /** Nur per Ping gefunden und noch nicht bestätigt */
+  discovered: boolean;
   /** Mindestens zwei verschiedene Geräte (MAC) beanspruchen die Adresse. */
   conflict: boolean;
 }
@@ -186,6 +204,11 @@ export interface IpamNetworkUsage {
   /** Belegte Adressen, die in keinem Bereich liegen */
   unassignedUsed: number;
   conflicts: number;
+  /** Davon gefunden, aber noch nicht bestätigt */
+  discovered: number;
+  /** Antworten beim letzten Ping-Durchlauf */
+  online: number;
+  lastScanAt: string | null;
 }
 
 export interface IpamUsage {
@@ -230,3 +253,37 @@ export const ipamImportInput = z.object({
   withPoolRange: z.boolean().default(true),
 });
 export type IpamImportInput = z.input<typeof ipamImportInput>;
+
+export const ipamHostUpdate = z.object({
+  name: optionalText(100),
+  /** true = als bekannt bestätigt (nicht mehr hervorgehoben) */
+  acknowledged: z.boolean(),
+});
+export type IpamHostUpdate = z.input<typeof ipamHostUpdate>;
+
+export const SCAN_INTERVALS = [5, 15, 30, 60, 180, 720, 1440] as const;
+
+export const ipamScanSettings = z.object({
+  enabled: z.boolean(),
+  /** Abstand zwischen zwei Durchläufen in Minuten */
+  intervalMinutes: z.number().int().min(5).max(1440),
+});
+export type IpamScanSettings = z.infer<typeof ipamScanSettings>;
+
+export interface IpamScanStatus extends IpamScanSettings {
+  running: boolean;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  /** Dauer des letzten Durchlaufs in Sekunden */
+  lastDurationSeconds: number | null;
+  /** Anzahl geprüfter Adressen im letzten Durchlauf */
+  lastChecked: number | null;
+  lastError: string | null;
+}
+
+/** Erreichbarkeit aller bekannten Adressen, z. B. für die DNS-Ansicht. */
+export interface IpamReachability {
+  /** Netze, die schon geprüft wurden; Adressen darin ohne Antwort gelten als offline */
+  scanned: string[];
+  hosts: Record<string, { alive: boolean; lastSeen: string | null }>;
+}

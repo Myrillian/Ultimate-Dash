@@ -1,9 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import type {
   IpamCategory,
   IpamData,
   IpamNetwork,
+  IpamReachability,
+  IpamScanStatus,
   IpamSync,
   IpamUsage,
 } from '@ultimate-dash/shared';
@@ -27,10 +29,17 @@ const config: AppConfig = {
 let ctx: Awaited<ReturnType<typeof buildApp>>;
 let fake: FakeTechnitium;
 let cookie = '';
+/** Adressen, die im Test auf Ping antworten */
+let alive = new Set<string>();
 
 beforeEach(async () => {
   fake = await startFakeTechnitium();
-  ctx = await buildApp(config, { logger: false, startMonitor: false });
+  alive = new Set();
+  ctx = await buildApp(config, {
+    logger: false,
+    startMonitor: false,
+    pinger: async (address) => alive.has(address),
+  });
   const res = await ctx.app.inject({
     method: 'POST',
     url: '/api/auth/setup',
@@ -290,5 +299,135 @@ describe('IPAM-Abgleich mit Technitium', () => {
         remote: '10.10.10.1',
       },
     ]);
+  });
+});
+
+describe('Ping-Prüfung', () => {
+  const connect = () =>
+    call('PUT', '/api/technitium/settings', { url: fake.url, token: fake.token });
+  const usageOf = async (id: number) =>
+    (await call('GET', '/api/ipam/usage')).json<IpamUsage>().networks[id]!;
+
+  it('erkennt Typ je Adresse: Reservierung, Lease, statisch', async () => {
+    const { network } = await setup();
+    await connect();
+    const u = await usageOf(network.id);
+    const type = (ip: string) => u.addresses.find((a) => a.address === ip)!.type;
+    expect(type('10.10.10.20')).toBe('reservation'); // Reservierung + DNS
+    expect(type('10.10.10.101')).toBe('lease');
+    expect(type('10.10.10.10')).toBe('static'); // nur DNS
+  });
+
+  it('prüft per Ping, entdeckt Unbekanntes und zeigt Offline-Adressen', async () => {
+    const { network } = await setup();
+    await connect();
+    // Vor dem ersten Durchlauf ist nichts bekannt
+    expect((await usageOf(network.id)).addresses.every((a) => a.alive === null)).toBe(true);
+
+    alive = new Set(['10.10.10.20', '10.10.10.5']);
+    await ctx.scanner.run();
+
+    const u = await usageOf(network.id);
+    const byIp = Object.fromEntries(u.addresses.map((a) => [a.address, a]));
+    expect(byIp['10.10.10.20']).toMatchObject({ alive: true, discovered: false });
+    expect(byIp['10.10.10.10']).toMatchObject({ alive: false, type: 'static' }); // DNS, antwortet nicht
+    expect(byIp['10.10.10.5']).toMatchObject({ alive: true, discovered: true, type: 'static' });
+    expect(byIp['10.10.10.5']!.claims.map((c) => c.source)).toEqual(['discovered']);
+    expect(u.discovered).toBe(1);
+    expect(u.online).toBe(2);
+    expect(u.lastScanAt).not.toBeNull();
+  });
+
+  it('bestätigt Entdeckte, vergisst sie und merkt, wenn sie verschwinden', async () => {
+    const { network } = await setup();
+    await connect();
+    alive = new Set(['10.10.10.5']);
+    await ctx.scanner.run();
+    const found = (await usageOf(network.id)).addresses.find((a) => a.address === '10.10.10.5')!;
+    const hostId = found.claims[0]!.hostId!;
+
+    const ack = await call('PUT', `/api/ipam/hosts/${hostId}`, {
+      name: 'Drucker',
+      acknowledged: true,
+    });
+    expect(ack.statusCode).toBe(204);
+    let a = (await usageOf(network.id)).addresses.find((x) => x.address === '10.10.10.5')!;
+    expect(a).toMatchObject({ discovered: false, claims: [{ source: 'manual', name: 'Drucker' }] });
+
+    // Bestätigte Geräte bleiben belegt, auch wenn sie ausgeschaltet sind
+    alive = new Set();
+    await ctx.scanner.run();
+    a = (await usageOf(network.id)).addresses.find((x) => x.address === '10.10.10.5')!;
+    expect(a).toMatchObject({ alive: false, discovered: false });
+
+    expect((await call('DELETE', `/api/ipam/hosts/${hostId}`)).statusCode).toBe(204);
+    expect((await usageOf(network.id)).addresses.some((x) => x.address === '10.10.10.5')).toBe(
+      false,
+    );
+    expect((await call('DELETE', `/api/ipam/hosts/${hostId}`)).statusCode).toBe(404);
+  });
+
+  it('ein entdecktes Gerät, das nicht mehr antwortet, verschwindet aus der Liste', async () => {
+    const { network } = await setup();
+    await connect();
+    alive = new Set(['10.10.10.5']);
+    await ctx.scanner.run();
+    alive = new Set();
+    await ctx.scanner.run();
+    expect((await usageOf(network.id)).addresses.some((x) => x.address === '10.10.10.5')).toBe(
+      false,
+    );
+  });
+
+  it('überspringt Netze mit ausgeschalteter Prüfung', async () => {
+    const { network } = await setup();
+    await connect();
+    await call('PUT', `/api/ipam/networks/${network.id}`, { ...lan, scan: false });
+    alive = new Set(['10.10.10.5']);
+    await ctx.scanner.run();
+    const u = await usageOf(network.id);
+    expect(u.lastScanAt).toBeNull();
+    expect(u.addresses.some((a) => a.address === '10.10.10.5')).toBe(false);
+  });
+
+  it('liefert Erreichbarkeit für die DNS-Ansicht', async () => {
+    await setup();
+    await connect();
+    alive = new Set(['10.10.10.10']);
+    await ctx.scanner.run();
+    const r = (await call('GET', '/api/ipam/reachability')).json<IpamReachability>();
+    expect(r.scanned).toEqual(['10.10.10.0/24']);
+    expect(r.hosts['10.10.10.10']).toMatchObject({ alive: true });
+  });
+
+  it('Einstellungen prüfen und speichern, Durchlauf auf Abruf', async () => {
+    await setup();
+    const bad = await call('PUT', '/api/ipam/scan', { enabled: true, intervalMinutes: 1 });
+    expect(bad.statusCode).toBe(400);
+    const ok = await call('PUT', '/api/ipam/scan', { enabled: true, intervalMinutes: 60 });
+    expect(ok.json<IpamScanStatus>()).toMatchObject({ enabled: true, intervalMinutes: 60 });
+    expect((await call('GET', '/api/ipam/scan')).json<IpamScanStatus>().intervalMinutes).toBe(60);
+    const run = await call('POST', '/api/ipam/scan/run');
+    expect(run.statusCode).toBe(202);
+    await vi.waitFor(async () =>
+      expect((await call('GET', '/api/ipam/scan')).json<IpamScanStatus>().running).toBe(false),
+    );
+  });
+
+  it('Lesende dürfen Status sehen, aber nichts ändern', async () => {
+    await call('POST', '/api/users', { username: 'gast', password: 'ein-langes-passwort' });
+    const login = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { username: 'gast', password: 'ein-langes-passwort' },
+    });
+    const viewer = String(login.headers['set-cookie']).split(';')[0]!;
+    const as = (method: 'GET' | 'PUT' | 'POST', url: string, payload?: object) =>
+      ctx.app.inject({ method, url, payload, headers: { cookie: viewer } });
+    expect((await as('GET', '/api/ipam/scan')).statusCode).toBe(200);
+    expect((await as('POST', '/api/ipam/scan/run')).statusCode).toBe(403);
+    expect(
+      (await as('PUT', '/api/ipam/scan', { enabled: false, intervalMinutes: 30 })).statusCode,
+    ).toBe(403);
   });
 });

@@ -1,5 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import type { IpamReachability } from '@ultimate-dash/shared';
+import type { IpamHostStore } from '../ipam/hosts.js';
+import type { IpamScanner } from '../ipam/scanner.js';
 import type { IpamRepository } from '../ipam/repository.js';
 import type { IpamSyncService } from '../ipam/sync.js';
 import type { IpamUsageService } from '../ipam/usage.js';
@@ -8,7 +11,19 @@ const idParams = z.object({ id: z.coerce.number().int().positive() });
 
 export async function ipamRoutes(
   app: FastifyInstance,
-  { repo, usage, sync }: { repo: IpamRepository; usage: IpamUsageService; sync: IpamSyncService },
+  {
+    repo,
+    usage,
+    sync,
+    scanner,
+    hosts,
+  }: {
+    repo: IpamRepository;
+    usage: IpamUsageService;
+    sync: IpamSyncService;
+    scanner: IpamScanner;
+    hosts: IpamHostStore;
+  },
 ) {
   app.get('/ipam', async (_request, reply) => {
     reply.header('cache-control', 'no-store');
@@ -30,6 +45,39 @@ export async function ipamRoutes(
   app.post('/ipam/import', async (request, reply) =>
     reply.code(201).send(await sync.import(request.body as never, request.user!)),
   );
+
+  // Ping-Prüfung: Einstellungen, Status und ein Durchlauf auf Abruf.
+  app.get('/ipam/scan', async (_request, reply) => {
+    reply.header('cache-control', 'no-store');
+    return scanner.status();
+  });
+  app.put('/ipam/scan', async (request) => scanner.save(request.body, request.user!));
+  app.post('/ipam/scan/run', async (request, reply) =>
+    reply.code(202).send(scanner.runInBackground(request.user!)),
+  );
+
+  // Erreichbarkeit aller bekannten Adressen, z. B. für die DNS-Ansicht.
+  app.get('/ipam/reachability', async (_request, reply): Promise<IpamReachability> => {
+    reply.header('cache-control', 'no-store');
+    return {
+      scanned: repo
+        .all()
+        .networks.filter((n) => n.scan && n.lastScanAt)
+        .map((n) => n.cidr),
+      hosts: Object.fromEntries(
+        hosts.all().map((h) => [h.address, { alive: h.alive, lastSeen: h.lastSeenAt }]),
+      ),
+    };
+  });
+
+  app.put('/ipam/hosts/:id', async (request, reply) => {
+    hosts.update(idParams.parse(request.params).id, request.body as never, request.user!);
+    return reply.code(204).send();
+  });
+  app.delete('/ipam/hosts/:id', async (request, reply) => {
+    hosts.delete(idParams.parse(request.params).id, request.user!);
+    return reply.code(204).send();
+  });
 
   app.post('/ipam/networks', async (request, reply) =>
     reply.code(201).send(repo.createNetwork(request.body as never, request.user!)),

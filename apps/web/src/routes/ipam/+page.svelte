@@ -3,17 +3,19 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import type {
+    IpamAddressUsage,
     IpamData,
     IpamNetwork,
     IpamNetworkUsage,
     IpamRange,
+    IpamScanStatus,
     IpamSync,
     IpamUsage,
   } from '@ultimate-dash/shared';
   import { ipv4RangeSize, ipv4ToInt, parseCidr } from '@ultimate-dash/shared';
   import { api } from '$lib/api';
   import { auth } from '$lib/auth.svelte';
-  import { formatPercent } from '$lib/format';
+  import { formatAgo, formatPercent } from '$lib/format';
   import { buildCells, categoryColor } from '$lib/ipam';
   import { theme } from '$lib/theme.svelte';
   import { toasts } from '$lib/toasts.svelte';
@@ -21,6 +23,9 @@
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import IpGrid from '$lib/components/IpGrid.svelte';
   import NetworkForm from '$lib/components/NetworkForm.svelte';
+  import HostDialog from '$lib/components/HostDialog.svelte';
+  import ReachDot from '$lib/components/ReachDot.svelte';
+  import ScanDialog from '$lib/components/ScanDialog.svelte';
   import SyncPanel from '$lib/components/SyncPanel.svelte';
   import RangeForm from '$lib/components/RangeForm.svelte';
   import TechNav from '$lib/components/TechNav.svelte';
@@ -30,6 +35,13 @@
   let data = $state<IpamData>({ networks: [], categories: [], ranges: [] });
   let usage = $state<IpamUsage>({ available: true, reason: null, networks: {} });
   let sync = $state<IpamSync>({ available: false, reason: null, suggestions: [], drift: [] });
+  let scan = $state<IpamScanStatus | null>(null);
+  let scanOpen = $state(false);
+  let hostForm = $state<{ open: boolean; row: IpamAddressUsage | null }>({
+    open: false,
+    row: null,
+  });
+  let filter = $state<'all' | 'discovered' | 'offline'>('all');
   let loaded = $state(false);
   let error = $state<string | null>(null);
   let refreshing = $state(false);
@@ -68,6 +80,8 @@
 
   const rows = $derived(
     (netUsage?.addresses ?? []).filter((a) => {
+      if (filter === 'discovered' && !a.discovered) return false;
+      if (filter === 'offline' && a.alive !== false) return false;
       const q = query.trim().toLowerCase();
       if (!q) return true;
       return (
@@ -81,6 +95,41 @@
     return netRanges.find((r) => n >= ipv4ToInt(r.startAddress)! && n <= ipv4ToInt(r.endAddress)!);
   };
 
+  /** Ein Durchlauf auf Abruf; wir fragen den Stand ab, bis er fertig ist, und laden dann neu. */
+  async function runScan() {
+    try {
+      scan = await api.runIpamScan();
+    } catch (e) {
+      toasts.show(e instanceof Error ? e.message : 'Scan konnte nicht starten', 'error');
+      return;
+    }
+    for (let i = 0; i < 300 && scan?.running; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      scan = await api.ipamScan().catch(() => scan);
+    }
+    if (scan?.lastError) toasts.show(scan.lastError, 'error');
+    else toasts.show('Scan abgeschlossen');
+    await load();
+  }
+
+  async function acknowledge(values: { name: string }) {
+    const row = hostForm.row;
+    const hostId = row?.claims.find((c) => c.hostId !== null)?.hostId;
+    if (!row || !hostId) return;
+    await api.updateIpamHost(hostId, { ...values, acknowledged: true });
+    toasts.show(row.discovered ? 'Gerät bestätigt' : 'Gerät gespeichert');
+    hostForm.open = false;
+    await load();
+  }
+
+  const forget = (row: IpamAddressUsage) =>
+    ask(
+      'Gerät vergessen?',
+      `${row.address} wird aus der Liste entfernt. Antwortet es beim nächsten Scan wieder, erscheint es erneut als entdeckt.`,
+      () => api.deleteIpamHost(row.claims.find((c) => c.hostId !== null)!.hostId!),
+      'Gerät vergessen',
+    );
+
   async function load(initial = false) {
     refreshing = !initial;
     try {
@@ -89,6 +138,7 @@
       sync = auth.isAdmin
         ? await api.ipamSync().catch(() => sync)
         : { available: false, reason: null, suggestions: [], drift: [] };
+      scan = await api.ipamScan().catch(() => scan);
       error = null;
     } catch (e) {
       error = e instanceof Error ? e.message : 'IPAM-Daten konnten nicht geladen werden';
@@ -204,8 +254,31 @@
     return { hosts, parts, unassigned: Math.max(0, hosts - assigned), u };
   }
 
-  const sourceLabel = { lease: 'Lease', reservation: 'Reservierung', dns: 'DNS' } as const;
+  const typeLabel = { reservation: 'Reservierung', lease: 'Lease', static: 'Statisch' } as const;
+  const sourceLabel = {
+    lease: 'DHCP-Lease',
+    reservation: 'DHCP-Reservierung',
+    dns: 'DNS',
+    discovered: 'Ping',
+    manual: 'Von Hand',
+  } as const;
 </script>
+
+{#snippet scanInfo()}
+  {#if scan}
+    <p class="text-xs text-fg-muted" role="status">
+      {#if scan.running}
+        Ping-Prüfung läuft gerade …
+      {:else if !scan.enabled}
+        Ping-Prüfung ist aus.
+      {:else if scan.lastRunAt}
+        Letzte Ping-Prüfung {formatAgo(scan.lastRunAt)}, danach alle {scan.intervalMinutes} Min.
+      {:else}
+        Die erste Ping-Prüfung läuft kurz nach dem Start des Servers.
+      {/if}
+    </p>
+  {/if}
+{/snippet}
 
 {#snippet usageBar(n: IpamNetwork)}
   {@const b = breakdown(n)}
@@ -243,6 +316,21 @@
     </h1>
     <TechNav />
     <div class="ml-auto flex items-center gap-1">
+      {#if auth.isAdmin}
+        <button type="button" class="btn" disabled={scan?.running} onclick={runScan}>
+          <UiIcon name="refresh" size={16} class={scan?.running ? 'animate-spin' : ''} />
+          {scan?.running ? 'Scannt …' : 'Jetzt scannen'}
+        </button>
+        <button
+          type="button"
+          class="icon-btn"
+          aria-label="Ping-Prüfung einstellen"
+          title="Ping-Prüfung einstellen"
+          onclick={() => (scanOpen = true)}
+        >
+          <UiIcon name="settings" size={16} />
+        </button>
+      {/if}
       <button
         type="button"
         class="icon-btn"
@@ -290,6 +378,7 @@
       <!-- Übersicht -->
       <div class="flex flex-wrap items-center gap-2">
         <h2 class="text-lg font-semibold">Netze</h2>
+        <div class="min-w-0">{@render scanInfo()}</div>
         {#if auth.isAdmin}
           <div class="ml-auto flex gap-2">
             <button type="button" class="btn" onclick={() => (categoriesOpen = true)}>
@@ -347,6 +436,11 @@
                       b.hosts,
                     )})</span
                   >
+                  {#if b.u.discovered > 0}
+                    <span class="font-medium" style="color: var(--discovered)"
+                      >{b.u.discovered} neu entdeckt</span
+                    >
+                  {/if}
                   {#if b.u.conflicts > 0}
                     <span class="font-medium text-down"
                       >{b.u.conflicts} Konflikt{b.u.conflicts > 1 ? 'e' : ''}</span
@@ -433,6 +527,14 @@
             <p class="text-sm tabular-nums">
               <span class="font-semibold">{netUsage.used}</span> von {netUsage.hosts} Adressen belegt
               ({formatPercent(netUsage.used, netUsage.hosts)})
+              {#if netUsage.lastScanAt}
+                · {netUsage.online} online
+              {/if}
+              {#if netUsage.discovered > 0}
+                · <span class="font-medium" style="color: var(--discovered)"
+                  >{netUsage.discovered} neu entdeckt</span
+                >
+              {/if}
               {#if netUsage.conflicts > 0}
                 · <span class="font-medium text-down"
                   >{netUsage.conflicts} Konflikt{netUsage.conflicts > 1 ? 'e' : ''}</span
@@ -440,6 +542,7 @@
               {/if}
             </p>
           {/if}
+          {@render scanInfo()}
           {#if cells.length > 0}
             <IpGrid {cells} label="Adressen von {network.name}" />
           {:else if cidr}
@@ -555,6 +658,17 @@
       <section aria-label="Belegte Adressen" class="grid min-w-0 gap-3">
         <div class="flex flex-wrap items-center gap-3">
           <h3 class="font-semibold">Belegte Adressen</h3>
+          <div class="flex gap-1" role="group" aria-label="Filter">
+            {#each [['all', 'Alle'], ['discovered', `Entdeckt${netUsage?.discovered ? ` (${netUsage.discovered})` : ''}`], ['offline', 'Offline']] as [value, text] (value)}
+              <button
+                type="button"
+                class="btn px-2.5 py-1 text-xs"
+                class:bg-muted={filter === value}
+                aria-pressed={filter === value}
+                onclick={() => (filter = value as typeof filter)}>{text}</button
+              >
+            {/each}
+          </div>
           <div class="relative ml-auto w-full sm:w-64">
             <UiIcon
               name="search"
@@ -574,7 +688,9 @@
           <p class="text-sm text-fg-muted">Ohne Verbindung zu Technitium gibt es keine Belegung.</p>
         {:else if rows.length === 0}
           <p class="text-sm text-fg-muted">
-            {query ? 'Keine Treffer.' : 'Keine belegten Adressen in diesem Netz.'}
+            {query || filter !== 'all'
+              ? 'Keine Treffer.'
+              : 'Keine belegten Adressen in diesem Netz.'}
           </p>
         {:else}
           <div class="relative overflow-x-auto rounded-2xl border border-line bg-elevated">
@@ -583,15 +699,21 @@
                 <tr class="border-b border-line">
                   <th class="px-3 py-2 font-medium">Adresse</th>
                   <th class="px-3 py-2 font-medium">Name</th>
+                  <th class="px-3 py-2 font-medium">Typ</th>
+                  <th class="px-3 py-2 font-medium">Status</th>
                   <th class="px-3 py-2 font-medium">Quelle</th>
                   <th class="px-3 py-2 font-medium">MAC</th>
                   <th class="px-3 py-2 font-medium">Kategorie</th>
+                  <th class="px-3 py-2"><span class="sr-only">Aktionen</span></th>
                 </tr>
               </thead>
               <tbody>
                 {#each rows as row (row.address)}
                   {@const cat = categoryOf(rangeOf(row.address)?.categoryId ?? 0)}
-                  <tr class="border-t border-line align-top">
+                  <tr
+                    class="border-t border-line align-top"
+                    style={row.discovered ? 'background: var(--discovered-bg)' : ''}
+                  >
                     <td class="px-3 py-2 font-mono text-xs whitespace-nowrap">
                       {row.address}
                       {#if row.conflict}<span class="ml-1 font-sans font-semibold text-down"
@@ -605,6 +727,18 @@
                         <span class="block">{name}</span>
                       {:else}–{/each}
                     </td>
+                    <td class="px-3 py-2 whitespace-nowrap">
+                      {typeLabel[row.type]}
+                      {#if row.discovered}
+                        <span
+                          class="ml-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold"
+                          style="color: var(--discovered); border: 1px solid var(--discovered)"
+                          >Entdeckt</span
+                        >
+                      {/if}
+                    </td>
+                    <td class="px-3 py-2"><ReachDot alive={row.alive} lastSeen={row.lastSeen} /></td
+                    >
                     <td class="px-3 py-2 whitespace-nowrap text-fg-muted">
                       {[...new Set(row.claims.map((c) => sourceLabel[c.source]))].join(', ')}
                     </td>
@@ -626,6 +760,25 @@
                         </span>
                       {:else}<span class="text-fg-muted">–</span>{/if}
                     </td>
+                    <td class="px-3 py-2 text-right whitespace-nowrap">
+                      {#if auth.isAdmin && row.claims.some((c) => c.hostId !== null)}
+                        <button
+                          type="button"
+                          class="btn px-2.5 py-1 text-xs"
+                          aria-label="{row.address} {row.discovered ? 'bestätigen' : 'bearbeiten'}"
+                          onclick={() => (hostForm = { open: true, row })}
+                          >{row.discovered ? 'Bestätigen' : 'Bearbeiten'}</button
+                        >
+                        <button
+                          type="button"
+                          class="icon-btn"
+                          aria-label="{row.address} vergessen"
+                          onclick={() => forget(row)}
+                        >
+                          <UiIcon name="trash" size={16} />
+                        </button>
+                      {/if}
+                    </td>
                   </tr>
                 {/each}
               </tbody>
@@ -637,6 +790,22 @@
   {/if}
 </div>
 
+<ScanDialog
+  open={scanOpen}
+  status={scan}
+  onclose={() => (scanOpen = false)}
+  onchanged={() => load()}
+/>
+{#if hostForm.row}
+  <HostDialog
+    open={hostForm.open}
+    address={hostForm.row.address}
+    name={hostForm.row.claims.find((c) => c.hostId !== null)?.name ?? null}
+    confirmed={!hostForm.row.discovered}
+    onclose={() => (hostForm.open = false)}
+    onsubmit={acknowledge}
+  />
+{/if}
 <NetworkForm
   open={networkForm.open}
   existing={networkForm.existing}

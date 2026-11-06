@@ -5,7 +5,11 @@ import type {
   IpamNetwork,
   IpamNetworkInput,
   IpamImportInput,
+  IpamHostUpdate,
   IpamRange,
+  IpamReachability,
+  IpamScanSettings,
+  IpamScanStatus,
   IpamSync,
   IpamRangeInput,
   IpamUsage,
@@ -149,6 +153,13 @@ export const api = {
 
   ipam: () => request<IpamData>('GET', '/ipam'),
   ipamUsage: () => request<IpamUsage>('GET', '/ipam/usage'),
+  ipamScan: () => request<IpamScanStatus>('GET', '/ipam/scan'),
+  saveIpamScan: (input: IpamScanSettings) => request<IpamScanStatus>('PUT', '/ipam/scan', input),
+  runIpamScan: () => request<IpamScanStatus>('POST', '/ipam/scan/run'),
+  ipamReachability: () => request<IpamReachability>('GET', '/ipam/reachability'),
+  updateIpamHost: (id: number, input: IpamHostUpdate) =>
+    request<void>('PUT', `/ipam/hosts/${id}`, input),
+  deleteIpamHost: (id: number) => request<void>('DELETE', `/ipam/hosts/${id}`),
   ipamSync: () => request<IpamSync>('GET', '/ipam/sync'),
   importIpam: (input: IpamImportInput) => request<IpamNetwork[]>('POST', '/ipam/import', input),
   createIpamNetwork: (input: IpamNetworkInput) =>

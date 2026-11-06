@@ -29,6 +29,8 @@ const toNetwork = (row: typeof ipamNetworks.$inferSelect): IpamNetwork => ({
   vlanId: row.vlanId,
   gateway: row.gateway,
   description: row.description,
+  scan: row.scan,
+  lastScanAt: row.lastScanAt,
 });
 
 const toCategory = (row: typeof ipamCategories.$inferSelect): IpamCategory => ({
@@ -76,6 +78,11 @@ export class IpamRepository {
         .map(toRange)
         .sort((a, b) => ipv4ToInt(a.startAddress)! - ipv4ToInt(b.startAddress)!),
     };
+  }
+
+  /** Vom Scanner: Ende des letzten Durchlaufs über das Netz. */
+  markScanned(id: number, at: string) {
+    this.db.update(ipamNetworks).set({ lastScanAt: at }).where(eq(ipamNetworks.id, id)).run();
   }
 
   private log(user: User, action: string, target: string, details: Record<string, unknown> = {}) {
@@ -142,12 +149,17 @@ export class IpamRepository {
   }
 
   updateNetwork(id: number, raw: IpamNetworkInput, user: User): IpamNetwork {
-    this.network(id);
+    const before = this.network(id);
     const input = ipamNetworkInput.parse(raw);
     this.checkNetwork(input, id);
     const row = this.db
       .update(ipamNetworks)
-      .set({ ...input, updatedAt: new Date().toISOString() })
+      .set({
+        ...input,
+        // Ein anderes Netz wurde noch nie geprüft.
+        ...(input.cidr.trim() !== before.cidr ? { lastScanAt: null } : {}),
+        updatedAt: new Date().toISOString(),
+      })
       .where(eq(ipamNetworks.id, id))
       .returning()
       .get();

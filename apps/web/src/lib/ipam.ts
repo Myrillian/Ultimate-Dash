@@ -22,7 +22,15 @@ export const colorNames: Record<CategoryColor, string> = {
 };
 
 export type CellKind =
-  'network' | 'broadcast' | 'gateway' | 'conflict' | 'reserved' | 'used' | 'pool' | 'free';
+  | 'network'
+  | 'broadcast'
+  | 'gateway'
+  | 'conflict'
+  | 'reserved'
+  | 'used'
+  | 'static'
+  | 'pool'
+  | 'free';
 
 export interface Cell {
   address: string;
@@ -62,8 +70,8 @@ export function buildCells(
     if (n === cidr.first) kind = 'network';
     else if (n === cidr.last) kind = 'broadcast';
     else if (u?.conflict) kind = 'conflict';
-    else if (u?.claims.some((c) => c.source === 'reservation')) kind = 'reserved';
-    else if (u) kind = 'used';
+    else if (u)
+      kind = u.type === 'reservation' ? 'reserved' : u.type === 'lease' ? 'used' : 'static';
     else if (n === gateway) kind = 'gateway';
     else if (pools.some((p) => n >= p.s && n <= p.e && !p.x.some(([a, b]) => n >= a && n <= b)))
       kind = 'pool';
@@ -83,8 +91,9 @@ export const cellKindLabel: Record<CellKind, string> = {
   broadcast: 'Broadcast',
   gateway: 'Gateway',
   conflict: 'Konflikt',
-  reserved: 'Reserviert',
-  used: 'Belegt',
+  reserved: 'Reservierung',
+  used: 'Lease',
+  static: 'Statisch',
   pool: 'DHCP-Pool (frei)',
   free: 'Frei',
 };

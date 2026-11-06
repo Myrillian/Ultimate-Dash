@@ -19,6 +19,9 @@ import { apiRoutes } from './routes/api.js';
 import { configRoutes } from './routes/config.js';
 import { iconRoutes } from './routes/icons.js';
 import { IpamRepository } from './ipam/repository.js';
+import { IpamHostStore } from './ipam/hosts.js';
+import { systemPing, type Pinger } from './ipam/ping.js';
+import { IpamScanner } from './ipam/scanner.js';
 import { IpamSyncService } from './ipam/sync.js';
 import { IpamUsageService } from './ipam/usage.js';
 import { ipamRoutes } from './routes/ipam.js';
@@ -34,6 +37,9 @@ export async function buildApp(
     logger?: FastifyServerOptions['logger'];
     startMonitor?: boolean;
     icons?: IconCatalogService;
+    /** Ping-Prüfung (Tests ersetzen sie) und ob der Zeitplan startet */
+    pinger?: Pinger;
+    startScanner?: boolean;
   } = {},
 ) {
   const app = Fastify({
@@ -109,14 +115,33 @@ export async function buildApp(
   const dhcp = new DhcpService(technitium);
   await app.register(technitiumRoutes, { prefix: '/api', technitium, dhcp, audit });
   const ipam = new IpamRepository(db, audit);
-  const ipamUsage = new IpamUsageService({
-    scopes: () => dhcp.scopes(),
-    leases: () => dhcp.leases(),
-    zones: () => technitium.zones(),
-    records: (zone) => technitium.records(zone),
+  const ipamHosts = new IpamHostStore(db, audit);
+  const ipamUsage = new IpamUsageService(
+    {
+      scopes: () => dhcp.scopes(),
+      leases: () => dhcp.leases(),
+      zones: () => technitium.zones(),
+      records: (zone) => technitium.records(zone),
+    },
+    () => ipamHosts.all(),
+  );
+  const scanner = new IpamScanner({
+    db,
+    audit,
+    repo: ipam,
+    hosts: ipamHosts,
+    ping: options.pinger ?? systemPing,
+    onError: (error) => app.log.warn({ err: error }, 'Ping-Prüfung fehlgeschlagen'),
   });
   const ipamSync = new IpamSyncService({ repo: ipam, audit, scopes: () => dhcp.scopes() });
-  await app.register(ipamRoutes, { prefix: '/api', repo: ipam, usage: ipamUsage, sync: ipamSync });
+  await app.register(ipamRoutes, {
+    prefix: '/api',
+    repo: ipam,
+    usage: ipamUsage,
+    sync: ipamSync,
+    scanner,
+    hosts: ipamHosts,
+  });
 
   if (config.webRoot && existsSync(config.webRoot)) {
     await app.register(fastifyStatic, {
@@ -149,12 +174,14 @@ export async function buildApp(
   app.addHook('onReady', async () => {
     authStore.purgeExpiredSessions();
     if (options.startMonitor !== false) monitor.start();
+    if (options.startScanner !== false && options.startMonitor !== false) scanner.start();
   });
   app.addHook('onClose', async () => {
     clearInterval(purge);
     monitor.stop();
+    scanner.stop();
     close();
   });
 
-  return { app, repo, authStore, monitor, events, technitium, audit };
+  return { app, repo, authStore, monitor, events, technitium, audit, scanner };
 }

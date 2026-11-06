@@ -12,6 +12,7 @@ import {
   type IpamUsage,
 } from '@ultimate-dash/shared';
 import { TechnitiumError } from '../technitium/client.js';
+import type { HostRow } from './hosts.js';
 
 /** Was die Belegungsberechnung von Technitium braucht (zum Testen austauschbar). */
 export interface UsageSources {
@@ -43,7 +44,10 @@ export class IpamUsageService {
   private cache: { at: number; snapshot: Snapshot } | null = null;
   private pending: Promise<Snapshot> | null = null;
 
-  constructor(private readonly sources: UsageSources) {}
+  constructor(
+    private readonly sources: UsageSources,
+    private readonly hosts: () => HostRow[] = () => [],
+  ) {}
 
   private load(): Promise<Snapshot> {
     if (this.cache && Date.now() - this.cache.at < CACHE_MS)
@@ -84,6 +88,7 @@ export class IpamUsageService {
           mac: r.hardwareAddress,
           name: r.hostName,
           scope: scope.name,
+          hostId: null,
         });
     for (const lease of leases) {
       const scope = scopes.find((s) => s.name === lease.scope);
@@ -100,6 +105,7 @@ export class IpamUsageService {
         mac: lease.hardwareAddress,
         name: lease.hostName,
         scope: lease.scope,
+        hostId: null,
       });
     }
 
@@ -115,6 +121,7 @@ export class IpamUsageService {
             mac: null,
             name: record.domain,
             scope: null,
+            hostId: null,
           });
 
     return { scopes, claims };
@@ -135,6 +142,7 @@ export class IpamUsageService {
       return { available: false, reason, networks: {} };
     }
 
+    const hostRows = new Map(this.hosts().map((h) => [ipv4ToInt(h.address)!, h]));
     const networks: Record<number, IpamNetworkUsage> = {};
     for (const network of data.networks) {
       const cidr = parseCidr(network.cidr)!;
@@ -150,14 +158,52 @@ export class IpamUsageService {
       );
       let unassignedUsed = 0;
       let conflicts = 0;
-      for (const [ip, claims] of snapshot.claims) {
+      let discovered = 0;
+      let online = 0;
+      const scanned = network.scan && network.lastScanAt !== null;
+
+      // Technitium-Quellen und per Ping gefundene Geräte zusammenführen.
+      const ips = new Set<number>();
+      for (const ip of snapshot.claims.keys()) ips.add(ip);
+      for (const [ip, host] of hostRows) if (host.acknowledged || host.alive) ips.add(ip);
+
+      for (const ip of ips) {
         if (ip < firstHost || ip > lastHost) continue;
+        const host = hostRows.get(ip);
+        const known = snapshot.claims.get(ip) ?? [];
+        const claims = [...known];
+        let isDiscovered = false;
+        if (host && (host.acknowledged || known.length === 0)) {
+          isDiscovered = !host.acknowledged;
+          claims.push({
+            source: host.acknowledged ? 'manual' : 'discovered',
+            mac: null,
+            name: host.name,
+            scope: null,
+            hostId: host.id,
+          });
+        }
         const macs = new Set(
           claims.map((c) => c.mac?.replace(/[:-]/g, '').toLowerCase()).filter(Boolean),
         );
         const conflict = macs.size > 1;
         if (conflict) conflicts++;
-        addresses.push({ address: intToString(ip), claims, conflict });
+        const alive = host ? host.alive : scanned ? false : null;
+        if (alive) online++;
+        if (isDiscovered) discovered++;
+        addresses.push({
+          address: intToString(ip),
+          claims,
+          type: claims.some((c) => c.source === 'reservation')
+            ? 'reservation'
+            : claims.some((c) => c.source === 'lease')
+              ? 'lease'
+              : 'static',
+          conflict,
+          alive,
+          lastSeen: host?.lastSeenAt ?? null,
+          discovered: isDiscovered,
+        });
         const range = ranges.find((r) => ip >= r.s && ip <= r.e);
         if (range) rangeUse[range.id]!.used++;
         else unassignedUsed++;
@@ -188,6 +234,9 @@ export class IpamUsageService {
         rangeUse,
         unassignedUsed,
         conflicts,
+        discovered,
+        online,
+        lastScanAt: network.scan ? network.lastScanAt : null,
       };
     }
     return { available: true, reason: null, networks };
