@@ -14,6 +14,7 @@ const config: AppConfig = {
   statusIntervalSeconds: 60,
   statusTimeoutMs: 1000,
   logLevel: 'silent',
+  oidc: null,
 };
 
 let ctx: Awaited<ReturnType<typeof buildApp>>;
