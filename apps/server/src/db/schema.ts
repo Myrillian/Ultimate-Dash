@@ -96,3 +96,42 @@ export const auditLog = sqliteTable(
   },
   (table) => [index('audit_log_at_idx').on(table.at)],
 );
+
+export const ipamNetworks = sqliteTable('ipam_networks', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  cidr: text('cidr').notNull(),
+  vlanId: integer('vlan_id'),
+  gateway: text('gateway'),
+  description: text('description'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  ...timestamps,
+});
+
+export const ipamCategories = sqliteTable('ipam_categories', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  /** Farbschlüssel aus der Palette (z. B. „blue“), nicht der Farbwert selbst. */
+  color: text('color').notNull(),
+  description: text('description'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  ...timestamps,
+});
+
+export const ipamRanges = sqliteTable(
+  'ipam_ranges',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    networkId: integer('network_id')
+      .notNull()
+      .references(() => ipamNetworks.id, { onDelete: 'cascade' }),
+    categoryId: integer('category_id')
+      .notNull()
+      .references(() => ipamCategories.id, { onDelete: 'cascade' }),
+    startAddress: text('start_address').notNull(),
+    endAddress: text('end_address').notNull(),
+    label: text('label'),
+    ...timestamps,
+  },
+  (table) => [index('ipam_ranges_network_idx').on(table.networkId)],
+);

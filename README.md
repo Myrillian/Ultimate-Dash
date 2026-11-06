@@ -171,3 +171,14 @@ Unter `/dhcp` (Link „DHCP ›“ im DNS-Bereich) zeigt Ultimate Dash alle Scop
 Technitium kennt kein „Reservierung ändern“. Ultimate Dash entfernt dafür die alte und legt die neue an. Schlägt das Anlegen fehl (zum Beispiel, weil die IP schon vergeben ist), wird die alte Reservierung wiederhergestellt. Scopes selbst lassen sich hier noch nicht anlegen oder bearbeiten, das geht weiter in Technitium. Das API-Token braucht die Rechte _DhcpServer: View_, _Modify_ und _Delete_. Alle Änderungen stehen im Änderungsprotokoll.
 
 Zum Ausprobieren ohne echten Server gibt es eine Simulation: `pnpm --filter @ultimate-dash/server fake:technitium` startet sie auf Port 5380 mit dem Token `dev-token`.
+
+## IPAM
+
+Unter **IPAM** (Umschalter neben DNS und DHCP) verwaltest du deine Netze:
+
+- **Netze** mit Adressbereich (z. B. `10.10.10.0/24`, Präfix /16 bis /30), VLAN, Gateway und Beschreibung. Netze dürfen sich nicht überschneiden.
+- **Kategorien** wie „Server“, „Clients“ oder „IoT“ mit einer Farbe. Sie dienen nur der Anzeige.
+- **IP-Bereiche**: Jedes Netz wird in Bereiche je Kategorie eingeteilt. Bereiche liegen im Netz und überschneiden sich nicht.
+- **Belegung** kommt live aus Technitium: DHCP-Leases, Reservierungen und DNS-A-Einträge. Das Raster (bis /22) zeigt jede Adresse farbig nach Kategorie, mit Zustand belegt, reserviert, DHCP-Pool, frei oder Konflikt (zwei Geräte beanspruchen dieselbe IP). Es ist per Pfeiltasten bedienbar, die Liste darunter nennt alle belegten Adressen mit Name, Quelle und MAC.
+
+Ohne Verbindung zu Technitium lassen sich Netze und Bereiche trotzdem pflegen, nur die Belegung fehlt. Änderungen sind Admins vorbehalten und stehen im Änderungsprotokoll.

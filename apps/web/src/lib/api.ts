@@ -1,4 +1,12 @@
 import type {
+  IpamCategory,
+  IpamCategoryInput,
+  IpamData,
+  IpamNetwork,
+  IpamNetworkInput,
+  IpamRange,
+  IpamRangeInput,
+  IpamUsage,
   AuthStatus,
   LoginInput,
   PasswordChangeInput,
@@ -136,4 +144,21 @@ export const api = {
   dhcpLeaseAction: (input: DhcpLeaseAction) =>
     request<void>('POST', '/technitium/dhcp/leases/action', input),
   audit: () => request<AuditEntry[]>('GET', '/audit'),
+
+  ipam: () => request<IpamData>('GET', '/ipam'),
+  ipamUsage: () => request<IpamUsage>('GET', '/ipam/usage'),
+  createIpamNetwork: (input: IpamNetworkInput) =>
+    request<IpamNetwork>('POST', '/ipam/networks', input),
+  updateIpamNetwork: (id: number, input: IpamNetworkInput) =>
+    request<IpamNetwork>('PUT', `/ipam/networks/${id}`, input),
+  deleteIpamNetwork: (id: number) => request<void>('DELETE', `/ipam/networks/${id}`),
+  createIpamCategory: (input: IpamCategoryInput) =>
+    request<IpamCategory>('POST', '/ipam/categories', input),
+  updateIpamCategory: (id: number, input: IpamCategoryInput) =>
+    request<IpamCategory>('PUT', `/ipam/categories/${id}`, input),
+  deleteIpamCategory: (id: number) => request<void>('DELETE', `/ipam/categories/${id}`),
+  createIpamRange: (input: IpamRangeInput) => request<IpamRange>('POST', '/ipam/ranges', input),
+  updateIpamRange: (id: number, input: IpamRangeInput) =>
+    request<IpamRange>('PUT', `/ipam/ranges/${id}`, input),
+  deleteIpamRange: (id: number) => request<void>('DELETE', `/ipam/ranges/${id}`),
 };
