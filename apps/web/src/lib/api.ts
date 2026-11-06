@@ -16,6 +16,11 @@ import type {
   ServiceInput,
   ServiceStatus,
   AuditEntry,
+  DnsRecordCreate,
+  DnsRecordDelete,
+  DnsRecordList,
+  DnsRecordUpdate,
+  DnsZone,
   BlockingAction,
   DnsSummary,
   StatsRange,
@@ -104,5 +109,12 @@ export const api = {
   dnsSummary: (range: StatsRange) =>
     request<DnsSummary>('GET', `/technitium/summary?range=${range}`),
   blocking: (action: BlockingAction) => request<void>('POST', '/technitium/blocking', action),
+  dnsZones: () => request<DnsZone[]>('GET', '/technitium/zones'),
+  dnsRecords: (zone: string) =>
+    request<DnsRecordList>('GET', `/technitium/records?zone=${encodeURIComponent(zone)}`),
+  addDnsRecord: (input: DnsRecordCreate) => request<void>('POST', '/technitium/records', input),
+  updateDnsRecord: (input: DnsRecordUpdate) => request<void>('PUT', '/technitium/records', input),
+  deleteDnsRecord: (input: DnsRecordDelete) =>
+    request<void>('POST', '/technitium/records/delete', input),
   audit: () => request<AuditEntry[]>('GET', '/audit'),
 };
