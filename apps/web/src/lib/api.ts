@@ -1,4 +1,7 @@
 import type {
+  SavedView,
+  SavedViewInput,
+  ViewScope,
   IpamIpDetail,
   CopyDashboardInput,
   CopySummary,
@@ -158,6 +161,9 @@ export const api = {
     request<void>('POST', '/technitium/dhcp/leases/action', input),
   audit: () => request<AuditEntry[]>('GET', '/audit'),
 
+  views: (scope: ViewScope) => request<SavedView[]>('GET', `/views?scope=${scope}`),
+  saveView: (input: SavedViewInput) => request<SavedView>('PUT', '/views', input),
+  deleteView: (id: number) => request<void>('DELETE', `/views/${id}`),
   ipam: () => request<IpamData>('GET', '/ipam'),
   ipamVendors: (prefixes: string[]) =>
     request<Record<string, string | null>>('GET', `/ipam/vendors?prefixes=${prefixes.join(',')}`),

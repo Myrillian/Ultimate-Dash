@@ -22,6 +22,7 @@
   } from '$lib/list-filter';
   import { vendors } from '$lib/vendors.svelte';
   import FilterBar, { type ColumnOption, type FilterGroup } from './FilterBar.svelte';
+  import SavedViews from './SavedViews.svelte';
   import ReachDot from './ReachDot.svelte';
   import UiIcon from './UiIcon.svelte';
 
@@ -127,6 +128,18 @@
     }
   }
   const visible = (key: string) => !hidden.includes(key);
+
+  const VIEW_KEYS = ['q', 'type', 'status', 'flag', 'cat', 'sort'] as const;
+  function applyView(params: Record<string, string>, hiddenColumns: string[]) {
+    typed = null;
+    setParams(Object.fromEntries(VIEW_KEYS.map((key) => [key, params[key] ?? null])));
+    hidden = hiddenColumns;
+    try {
+      localStorage.setItem(STORAGE_KEY, hidden.join(','));
+    } catch {
+      // ohne Speicher bleibt die Auswahl nur für diese Sitzung
+    }
+  }
 
   // ---- Zeilen aufbereiten ----
   const rangeOf = (address: string): IpamRange | undefined => {
@@ -306,7 +319,11 @@
     ontogglecolumn={toggleColumn}
     {onquery}
     onreset={reset}
-  />
+  >
+    {#snippet extra()}
+      <SavedViews scope="ipam" keys={VIEW_KEYS} {hidden} onapply={applyView} />
+    {/snippet}
+  </FilterBar>
 
   {#if entries.length === 0}
     <p class="text-sm text-fg-muted">Keine belegten Adressen in diesem Netz.</p>

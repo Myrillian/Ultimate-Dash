@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { integer, sqliteTable, text, index } from 'drizzle-orm/sqlite-core';
+import { integer, sqliteTable, text, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 const timestamps = {
   createdAt: text('created_at')
@@ -101,6 +101,23 @@ export const auditLog = sqliteTable(
     error: text('error'),
   },
   (table) => [index('audit_log_at_idx').on(table.at)],
+);
+
+/** Gespeicherte Listenansichten (Suche, Filter, Sortierung, Spalten), je Benutzer. */
+export const savedViews = sqliteTable(
+  'saved_views',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    scope: text('scope', { enum: ['ipam', 'dns'] }).notNull(),
+    name: text('name').notNull(),
+    params: text('params', { mode: 'json' }).$type<Record<string, string>>().notNull(),
+    hidden: text('hidden', { mode: 'json' }).$type<string[]>().notNull(),
+    createdAt: timestamps.createdAt,
+  },
+  (table) => [uniqueIndex('saved_views_unique').on(table.userId, table.scope, table.name)],
 );
 
 export const ipamNetworks = sqliteTable('ipam_networks', {

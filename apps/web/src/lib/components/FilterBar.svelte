@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import UiIcon from './UiIcon.svelte';
 
   export interface FilterGroup {
@@ -25,6 +26,8 @@
     ontogglecolumn?: (key: string) => void;
     onquery: (value: string) => void;
     onreset: () => void;
+    /** Zusätzliche Schaltflächen rechts (z. B. gespeicherte Ansichten). */
+    extra?: Snippet;
   }
   let {
     query,
@@ -38,6 +41,7 @@
     ontogglecolumn,
     onquery,
     onreset,
+    extra,
   }: Props = $props();
 
   const active = $derived(query.trim() !== '' || groups.some((g) => g.selected.length > 0));
@@ -68,25 +72,28 @@
         Zurücksetzen
       </button>
     {/if}
-    {#if columns.length > 0}
-      <details class="relative ml-auto">
-        <summary class="btn cursor-pointer px-2.5 py-1 text-xs">Spalten</summary>
-        <div
-          class="absolute right-0 z-20 mt-1 grid min-w-40 gap-1 rounded-xl border border-line bg-elevated p-2 text-sm shadow-xl"
-        >
-          {#each columns as column (column.key)}
-            <label class="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={column.visible}
-                onchange={() => ontogglecolumn?.(column.key)}
-              />
-              {column.label}
-            </label>
-          {/each}
-        </div>
-      </details>
-    {/if}
+    <div class="ml-auto flex items-center gap-2">
+      {@render extra?.()}
+      {#if columns.length > 0}
+        <details class="relative" name="filter-menu">
+          <summary class="btn cursor-pointer px-2.5 py-1 text-xs">Spalten</summary>
+          <div
+            class="absolute right-0 z-20 mt-1 grid min-w-40 gap-1 rounded-xl border border-line bg-elevated p-2 text-sm shadow-xl"
+          >
+            {#each columns as column (column.key)}
+              <label class="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={column.visible}
+                  onchange={() => ontogglecolumn?.(column.key)}
+                />
+                {column.label}
+              </label>
+            {/each}
+          </div>
+        </details>
+      {/if}
+    </div>
   </div>
   {#if groups.length > 0}
     <div class="flex flex-wrap gap-x-4 gap-y-2">

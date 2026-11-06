@@ -7,9 +7,22 @@
   import { api, ApiError } from '$lib/api';
   import { auth } from '$lib/auth.svelte';
   import { relativeName, type RecordFormValues } from '$lib/dns-records';
+  import {
+    compareText,
+    formatSort,
+    matchesAll,
+    nextSort,
+    parseSort,
+    splitList,
+    toggleIn,
+    tokensOf,
+    type SortState,
+  } from '$lib/list-filter';
   import { theme } from '$lib/theme.svelte';
   import { toasts } from '$lib/toasts.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import FilterBar, { type FilterGroup } from '$lib/components/FilterBar.svelte';
+  import SavedViews from '$lib/components/SavedViews.svelte';
   import ReachDot from '$lib/components/ReachDot.svelte';
   import RecordForm from '$lib/components/RecordForm.svelte';
   import TechNav from '$lib/components/TechNav.svelte';
@@ -23,8 +36,6 @@
   let recordsError = $state<string | null>(null);
   let loadingRecords = $state(false);
   let zoneFilter = $state('');
-  let query = $state('');
-  let typeFilter = $state('');
 
   let form = $state<{ open: boolean; record: DnsRecord | null }>({ open: false, record: null });
   let confirm = $state<{ open: boolean; record: DnsRecord | null }>({ open: false, record: null });
@@ -34,19 +45,122 @@
     zones.filter((z) => z.name.toLowerCase().includes(zoneFilter.trim().toLowerCase())),
   );
   const records = $derived(list?.records ?? []);
-  const types = $derived([...new Set(records.map((r) => r.type))].sort());
+
+  // ---- Suche, Filter und Sortierung; Zustand in der URL ----
+  const SORT_KEYS = ['name', 'type', 'value', 'ttl'];
+  const DEFAULT_SORT: SortState = { key: 'name', dir: 'asc' };
+  const VIEW_KEYS = ['q', 'type', 'state', 'sort'] as const;
+  const params = $derived(page.url.searchParams);
+  const urlQuery = $derived(params.get('q') ?? '');
+  const typeSel = $derived(splitList(params.get('type')));
+  const stateSel = $derived(splitList(params.get('state')));
+  const sort = $derived(parseSort(params.get('sort'), SORT_KEYS, DEFAULT_SORT));
+
+  function setParams(changes: Record<string, string | null>) {
+    const url = new URL(page.url);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) url.searchParams.set(key, value);
+      else url.searchParams.delete(key);
+    }
+    void goto(url, { keepFocus: true, noScroll: true, replaceState: true });
+  }
+
+  let queryTimer: ReturnType<typeof setTimeout> | undefined;
+  let typed = $state<string | null>(null);
+  const shownQuery = $derived(typed ?? urlQuery);
+  function onquery(value: string) {
+    typed = value;
+    clearTimeout(queryTimer);
+    queryTimer = setTimeout(() => {
+      setParams({ q: value.trim() || null });
+      typed = null;
+    }, 200);
+  }
+  const listParam = (key: string, current: string[], value: string) => {
+    const next = toggleIn(current, value);
+    setParams({ [key]: next.length > 0 ? next.join(',') : null });
+  };
+  const ontoggle = (group: string, value: string) =>
+    group === 'type' ? listParam('type', typeSel, value) : listParam('state', stateSel, value);
+  const reset = () => {
+    typed = null;
+    setParams({ q: null, type: null, state: null });
+  };
+  const sortBy = (key: string) => {
+    const next = nextSort(sort, key);
+    setParams({ sort: formatSort(next) === formatSort(DEFAULT_SORT) ? null : formatSort(next) });
+  };
+  const applyView = (saved: Record<string, string>) => {
+    typed = null;
+    setParams(Object.fromEntries(VIEW_KEYS.map((key) => [key, saved[key] ?? null])));
+  };
+
+  const stateOf = (r: DnsRecord) => (r.disabled ? 'disabled' : 'active');
+  const groups = $derived<FilterGroup[]>([
+    {
+      key: 'type',
+      label: 'Typ',
+      selected: typeSel,
+      options: [...new Set(records.map((r) => r.type))].sort().map((type) => ({
+        value: type,
+        label: type,
+        count: records.filter((r) => r.type === type).length,
+      })),
+    },
+    {
+      key: 'state',
+      label: 'Status',
+      selected: stateSel,
+      options: [
+        { value: 'active', label: 'Aktiv' },
+        { value: 'disabled', label: 'Deaktiviert' },
+      ],
+    },
+  ]);
+
+  const sortValue = (r: DnsRecord, key: string): string | number => {
+    switch (key) {
+      case 'type':
+        return r.type;
+      case 'value':
+        return r.display;
+      case 'ttl':
+        return r.ttl;
+      default:
+        return r.domain;
+    }
+  };
   const rows = $derived.by(() => {
-    const q = query.trim().toLowerCase();
+    const tokens = tokensOf(urlQuery);
+    const factor = sort.dir === 'asc' ? 1 : -1;
     return records
       .filter(
         (r) =>
-          (!typeFilter || r.type === typeFilter) &&
-          (!q ||
-            r.domain.toLowerCase().includes(q) ||
-            r.display.toLowerCase().includes(q) ||
-            (r.comments ?? '').toLowerCase().includes(q)),
+          (typeSel.length === 0 || typeSel.includes(r.type)) &&
+          (stateSel.length === 0 || stateSel.includes(stateOf(r))) &&
+          matchesAll(
+            [
+              r.domain,
+              r.type,
+              r.display,
+              r.comments ?? '',
+              String(r.ttl),
+              r.disabled ? 'deaktiviert' : '',
+            ]
+              .join(' ')
+              .toLocaleLowerCase('de'),
+            tokens,
+          ),
       )
-      .sort((a, b) => a.domain.localeCompare(b.domain) || a.type.localeCompare(b.type));
+      .sort((a, b) => {
+        const x = sortValue(a, sort.key);
+        const y = sortValue(b, sort.key);
+        const by =
+          typeof x === 'number' && typeof y === 'number'
+            ? x - y
+            : compareText(String(x), String(y));
+        return factor * by || compareText(a.domain, b.domain) || compareText(a.type, b.type);
+      });
   });
 
   function selectZone(name: string) {
@@ -89,8 +203,6 @@
 
   $effect(() => {
     if (selected) {
-      query = '';
-      typeFilter = '';
       void loadRecords(selected);
     }
   });
@@ -148,6 +260,18 @@
     }
   }
 </script>
+
+{#snippet th(key: string, label: string, cls: string)}
+  <th
+    class="{cls} font-medium"
+    aria-sort={sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+  >
+    <button type="button" class="inline-flex items-center gap-1" onclick={() => sortBy(key)}>
+      {label}
+      {#if sort.key === key}<UiIcon name={sort.dir === 'asc' ? 'up' : 'down'} size={12} />{/if}
+    </button>
+  </th>
+{/snippet}
 
 <div class="mx-auto flex min-h-dvh max-w-[1600px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10">
   <header class="flex flex-wrap items-center gap-3">
@@ -238,19 +362,6 @@
                     : ''}</span
                 >{/if}
             </h2>
-            <label class="sr-only" for="rec-search">Records durchsuchen</label>
-            <input
-              id="rec-search"
-              class="input w-48 py-1.5"
-              type="search"
-              placeholder="Suchen …"
-              bind:value={query}
-            />
-            <label class="sr-only" for="rec-type-filter">Nach Typ filtern</label>
-            <select id="rec-type-filter" class="input w-auto py-1.5" bind:value={typeFilter}>
-              <option value="">Alle Typen</option>
-              {#each types as type (type)}<option value={type}>{type}</option>{/each}
-            </select>
             {#if auth.isAdmin && list && !list.zone.internal}
               <button
                 type="button"
@@ -261,6 +372,22 @@
               </button>
             {/if}
           </div>
+
+          <FilterBar
+            query={shownQuery}
+            placeholder="Name, Wert, Kommentar …"
+            ariaLabel="Records durchsuchen"
+            {groups}
+            shown={rows.length}
+            total={records.length}
+            {ontoggle}
+            {onquery}
+            onreset={reset}
+          >
+            {#snippet extra()}
+              <SavedViews scope="dns" keys={VIEW_KEYS} onapply={applyView} />
+            {/snippet}
+          </FilterBar>
 
           {#if recordsError}
             <div class="rounded-2xl border border-down/40 bg-elevated p-5 text-sm" role="alert">
@@ -285,10 +412,10 @@
                 <caption class="sr-only">Records der Zone {selected}</caption>
                 <thead class="border-b border-line text-xs text-fg-muted">
                   <tr>
-                    <th class="px-4 py-2 font-medium">Name</th>
-                    <th class="px-2 py-2 font-medium">Typ</th>
-                    <th class="px-2 py-2 font-medium">Wert</th>
-                    <th class="px-2 py-2 text-right font-medium">TTL</th>
+                    {@render th('name', 'Name', 'px-4 py-2')}
+                    {@render th('type', 'Typ', 'px-2 py-2')}
+                    {@render th('value', 'Wert', 'px-2 py-2')}
+                    {@render th('ttl', 'TTL', 'px-2 py-2 text-right')}
                     <th class="w-20 px-2 py-2"><span class="sr-only">Aktionen</span></th>
                   </tr>
                 </thead>
@@ -361,9 +488,6 @@
                 </tbody>
               </table>
             </div>
-            <p class="text-xs text-fg-muted">
-              {rows.length}{rows.length !== records.length ? ` von ${records.length}` : ''} Einträge
-            </p>
           {/if}
         {:else}
           <p class="py-10 text-center text-fg-muted">Wähle links eine Zone.</p>
