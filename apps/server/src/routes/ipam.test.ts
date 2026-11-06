@@ -246,6 +246,21 @@ describe('IP-Detail', () => {
     expect((await call('GET', '/api/ipam/ip/kaputt')).statusCode).toBe(400);
   });
 
+  it('zeigt Änderungen in Technitium sofort, ohne auf den Zwischenspeicher zu warten', async () => {
+    await setup();
+    await call('PUT', '/api/technitium/settings', { url: fake.url, token: fake.token });
+    const before = (await call('GET', '/api/ipam/ip/10.10.10.101')).json<IpamIpDetail>();
+    expect(before.type).toBe('lease');
+    const res = await call('POST', '/api/technitium/dhcp/leases/action', {
+      scope: 'LAN',
+      hardwareAddress: 'AA-BB-CC-00-00-02',
+      action: 'reserve',
+    });
+    expect(res.statusCode).toBeLessThan(300);
+    const after = (await call('GET', '/api/ipam/ip/10.10.10.101')).json<IpamIpDetail>();
+    expect(after.type).toBe('reservation');
+  });
+
   it('ist ohne Technitium-Verbindung ein 503', async () => {
     await setup();
     expect((await call('GET', '/api/ipam/ip/10.10.10.20')).statusCode).toBe(503);

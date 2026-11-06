@@ -821,6 +821,7 @@
     categories={data.categories}
     version={panelVersion}
     onclose={() => openPanel(null)}
+    onchanged={() => load()}
   />
 {/if}
 
