@@ -33,3 +33,19 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          load: true
+          tags: ultimate-dash:ci
+      - name: Startprobe mit root-eigenem Datenordner
+        run: |
+          # Wie auf einem frischen Host: Docker legt ./data als root an.
+          sudo mkdir -p "$RUNNER_TEMP/data" && sudo chown root:root "$RUNNER_TEMP/data"
+          docker run -d --name ud -p 3000:3000 -v "$RUNNER_TEMP/data:/data" ultimate-dash:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/api/health; then echo; break; fi
+            sleep 1
+          done
+          docker logs ud
+          curl -fsS http://127.0.0.1:3000/api/health
+          # App läuft nicht als root, Datenbank gehört node
+          test "$(docker exec ud stat -c %u /proc/1)" = "1000"
+          test "$(sudo stat -c %u "$RUNNER_TEMP/data/ultimate-dash.db")" = "1000"
