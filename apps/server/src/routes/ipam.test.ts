@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import type {
   IpamCategory,
   IpamData,
+  IpamIpDetail,
   IpamNetwork,
   IpamReachability,
   IpamScanStatus,
@@ -216,6 +217,38 @@ describe('IPAM-Belegung', () => {
     const u = usage.networks[network.id]!;
     expect(u.addresses.find((a) => a.address === '10.10.10.101')!.conflict).toBe(true);
     expect(u.conflicts).toBe(1);
+  });
+});
+
+describe('IP-Detail', () => {
+  it('liefert Reservierung, DNS und Reverse-Eintrag zu einer Adresse', async () => {
+    const { network, servers } = await setup();
+    await range(network.id, servers.id, '10.10.10.2', '10.10.10.50');
+    await call('PUT', '/api/technitium/settings', { url: fake.url, token: fake.token });
+    const res = await call('GET', '/api/ipam/ip/10.10.10.20');
+    expect(res.statusCode).toBe(200);
+    const d = res.json<IpamIpDetail>();
+    expect(d).toMatchObject({ state: 'used', type: 'reservation', networkId: network.id });
+    expect(d.dhcp.reservation?.mac).toBeTruthy();
+    expect(d.dns.forward.length).toBeGreaterThan(0);
+    expect(d.dns.reverseZone).toBe('10.10.10.in-addr.arpa');
+    const ptr = (await call('GET', '/api/ipam/ip/10.10.10.10')).json<IpamIpDetail>();
+    expect(ptr.dns.reverse?.zone).toBe('10.10.10.in-addr.arpa');
+    expect(ptr.rangeId).toBe(servers.id);
+  });
+
+  it('zeigt freie Adressen und lehnt Adressen außerhalb der Netze ab', async () => {
+    await setup();
+    await call('PUT', '/api/technitium/settings', { url: fake.url, token: fake.token });
+    const free = (await call('GET', '/api/ipam/ip/10.10.10.222')).json<IpamIpDetail>();
+    expect(free).toMatchObject({ state: 'free', type: null });
+    expect((await call('GET', '/api/ipam/ip/192.168.99.5')).statusCode).toBe(404);
+    expect((await call('GET', '/api/ipam/ip/kaputt')).statusCode).toBe(400);
+  });
+
+  it('ist ohne Technitium-Verbindung ein 503', async () => {
+    await setup();
+    expect((await call('GET', '/api/ipam/ip/10.10.10.20')).statusCode).toBe(503);
   });
 });
 

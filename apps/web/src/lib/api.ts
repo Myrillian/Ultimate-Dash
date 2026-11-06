@@ -1,4 +1,5 @@
 import type {
+  IpamIpDetail,
   CopyDashboardInput,
   CopySummary,
   DashboardSource,
@@ -158,6 +159,7 @@ export const api = {
   audit: () => request<AuditEntry[]>('GET', '/audit'),
 
   ipam: () => request<IpamData>('GET', '/ipam'),
+  ipamIp: (address: string) => request<IpamIpDetail>('GET', `/ipam/ip/${address}`),
   ipamUsage: () => request<IpamUsage>('GET', '/ipam/usage'),
   ipamScan: () => request<IpamScanStatus>('GET', '/ipam/scan'),
   saveIpamScan: (input: IpamScanSettings) => request<IpamScanStatus>('PUT', '/ipam/scan', input),

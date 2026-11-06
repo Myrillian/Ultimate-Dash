@@ -22,6 +22,7 @@
   import CategoriesDialog from '$lib/components/CategoriesDialog.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import IpGrid from '$lib/components/IpGrid.svelte';
+  import IpPanel from '$lib/components/IpPanel.svelte';
   import NetworkForm from '$lib/components/NetworkForm.svelte';
   import HostDialog from '$lib/components/HostDialog.svelte';
   import ReachDot from '$lib/components/ReachDot.svelte';
@@ -62,6 +63,16 @@
     action: () => Promise<void>;
   }>({ open: false, title: '', message: '', action: async () => {} });
   let query = $state('');
+
+  // Adresse im Seitenfenster; steht in der URL (?ip=), damit Links und Zurück-Taste funktionieren.
+  const panelAddress = $derived(page.url.searchParams.get('ip'));
+  let panelVersion = $state(0);
+  function openPanel(address: string | null) {
+    const url = new URL(page.url);
+    if (address) url.searchParams.set('ip', address);
+    else url.searchParams.delete('ip');
+    void goto(url, { keepFocus: true, noScroll: true, replaceState: true });
+  }
 
   const selectedId = $derived(Number(page.url.searchParams.get('net')) || null);
   const network = $derived(data.networks.find((n) => n.id === selectedId) ?? null);
@@ -544,7 +555,14 @@
           {/if}
           {@render scanInfo()}
           {#if cells.length > 0}
-            <IpGrid {cells} label="Adressen von {network.name}" />
+            <IpGrid
+              {cells}
+              label="Adressen von {network.name}"
+              selected={panelAddress}
+              onpick={(cell) => {
+                if (cell.kind !== 'network' && cell.kind !== 'broadcast') openPanel(cell.address);
+              }}
+            />
           {:else if cidr}
             <p class="text-sm text-fg-muted">
               Das Raster gibt es für Netze bis /22. Die belegten Adressen stehen in der Liste.
@@ -712,10 +730,16 @@
                   {@const cat = categoryOf(rangeOf(row.address)?.categoryId ?? 0)}
                   <tr
                     class="border-t border-line align-top"
+                    class:bg-muted={panelAddress === row.address}
                     style={row.discovered ? 'background: var(--discovered-bg)' : ''}
                   >
                     <td class="px-3 py-2 font-mono text-xs whitespace-nowrap">
-                      {row.address}
+                      <button
+                        type="button"
+                        class="font-mono text-xs text-accent hover:underline"
+                        aria-label="Details zu {row.address} öffnen"
+                        onclick={() => openPanel(row.address)}>{row.address}</button
+                      >
                       {#if row.conflict}<span class="ml-1 font-sans font-semibold text-down"
                           >Konflikt</span
                         >{/if}
@@ -789,6 +813,16 @@
     {/if}
   {/if}
 </div>
+
+{#if panelAddress && network}
+  <IpPanel
+    address={panelAddress}
+    {network}
+    categories={data.categories}
+    version={panelVersion}
+    onclose={() => openPanel(null)}
+  />
+{/if}
 
 <ScanDialog
   open={scanOpen}
