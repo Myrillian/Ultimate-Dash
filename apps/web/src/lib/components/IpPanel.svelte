@@ -1,10 +1,13 @@
 <script lang="ts">
-  import type {
-    DhcpScope,
-    DnsRecord,
-    IpamCategory,
-    IpamIpDetail,
-    IpamNetwork,
+  import {
+    ipamHintLabels,
+    ipamHints,
+    type DhcpScope,
+    type DnsRecord,
+    type IpamCategory,
+    type IpamHintKind,
+    type IpamIpDetail,
+    type IpamNetwork,
   } from '@ultimate-dash/shared';
   import { api } from '$lib/api';
   import { auth } from '$lib/auth.svelte';
@@ -290,6 +293,57 @@
       'Eintrag gelöscht',
     );
 
+  // ---- Hinweise zur Konsistenz (DHCP und DNS) und ihre Behebung ----
+  const hints = $derived(
+    detail
+      ? ipamHints({
+          reservationName: detail.dhcp.reservation?.hostName ?? null,
+          dnsNames: detail.dns.forward.map((f) => f.domain),
+          reverseZone: detail.dns.reverseZone,
+          hasPtr: !!detail.dns.reverse,
+        })
+      : [],
+  );
+
+  /** Den A-Eintrag unverändert speichern, optional unter neuem Namen; Technitium zieht den PTR mit. */
+  const syncRecord = (
+    record: { zone: string; domain: string; ttl: number; comment: string | null },
+    domain: string,
+  ) =>
+    api.updateDnsRecord({
+      zone: record.zone,
+      domain,
+      ttl: record.ttl,
+      comments: record.comment,
+      disabled: false,
+      createPtr: !!detail?.dns.reverseZone,
+      data: { type: 'A', ipAddress: address },
+      current: { domain: record.domain, data: { type: 'A', ipAddress: address } },
+    });
+
+  function fixHint(kind: IpamHintKind) {
+    const record = detail?.dns.forward[0];
+    if (kind === 'dns-missing') newRecord();
+    else if (kind === 'name-differs' && record) {
+      const name = detail?.dhcp.reservation?.hostName ?? '';
+      const domain = fullName(name, record.zone);
+      ask(
+        'A-Eintrag umbenennen?',
+        `${record.domain} wird zu ${domain}${detail?.dns.reverseZone ? '; der PTR-Eintrag wird mit angepasst' : ''}. Der DHCP-Name ${name} bleibt unverändert.`,
+        'Umbenennen',
+        () => syncRecord(record, domain),
+        'A-Eintrag umbenannt',
+      );
+    } else if (kind === 'ptr-missing' && record)
+      ask(
+        'PTR-Eintrag anlegen?',
+        `Für ${record.domain} wird in der Reverse-Zone ${detail?.dns.reverseZone} ein PTR-Eintrag angelegt.`,
+        'Anlegen',
+        () => syncRecord(record, record.domain),
+        'PTR-Eintrag angelegt',
+      );
+  }
+
   async function saveHost(values: { name: string }) {
     if (detail?.hostId == null) return;
     await api.updateIpamHost(detail.hostId, { ...values, acknowledged: true });
@@ -416,6 +470,48 @@
           </p>
         {/if}
       </section>
+
+      {#if hints.length > 0}
+        <section aria-labelledby="ip-hints" class="grid gap-1.5">
+          <h3
+            id="ip-hints"
+            class="text-xs font-semibold tracking-wide uppercase"
+            style="color: var(--discovered)"
+          >
+            Hinweise
+          </h3>
+          <ul class="grid gap-2">
+            {#each hints as hint (hint)}
+              <li class="rounded-xl border p-2.5" style="border-color: var(--discovered)">
+                <span class="font-medium">{ipamHintLabels[hint]}</span>
+                <span class="block text-fg-muted">
+                  {#if hint === 'dns-missing'}
+                    Die Reservierung {detail.dhcp.reservation?.hostName} hat keinen A-Eintrag.
+                  {:else if hint === 'name-differs'}
+                    DHCP heißt {detail.dhcp.reservation?.hostName}, im DNS steht {detail.dns.forward
+                      .map((f) => f.domain)
+                      .join(', ')}.
+                  {:else}
+                    Zum A-Eintrag gibt es in {detail.dns.reverseZone} keinen PTR-Eintrag.
+                  {/if}
+                </span>
+                {#if auth.isAdmin && (hint !== 'dns-missing' || zones.length > 0)}
+                  <button
+                    type="button"
+                    class="btn mt-1.5 px-2.5 py-1 text-xs"
+                    onclick={() => fixHint(hint)}
+                    >{hint === 'dns-missing'
+                      ? 'A-Eintrag anlegen'
+                      : hint === 'name-differs'
+                        ? 'A-Eintrag umbenennen'
+                        : 'PTR anlegen'}</button
+                  >
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
 
       <section aria-labelledby="ip-dhcp" class="grid gap-1.5">
         <h3 id="ip-dhcp" class="text-xs font-semibold tracking-wide text-fg-muted uppercase">
