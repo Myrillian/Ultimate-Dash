@@ -1,6 +1,10 @@
 import { asc, eq, inArray, max, sql } from 'drizzle-orm';
 import type {
+  ConfigFile,
   DashboardData,
+  ImportMode,
+  ImportSummary,
+  ParsedConfigFile,
   Group,
   GroupInput,
   Service,
@@ -176,6 +180,135 @@ export function createRepository(db: Db) {
       db.delete(services).where(eq(services.id, id)).run();
     },
 
+    /** Aktueller Stand als YAML-taugliches Objekt; Standardwerte werden weggelassen. */
+    exportConfig(): ConfigFile {
+      const dashboard = this.getDashboard();
+      return {
+        version: 1,
+        title: dashboard.title,
+        groups: dashboard.groups.map((g) => ({
+          name: g.name,
+          ...(g.icon ? { icon: g.icon } : {}),
+          ...(g.collapsed ? { collapsed: true } : {}),
+          services: g.services.map((s) => ({
+            name: s.name,
+            url: s.url,
+            ...(s.description ? { description: s.description } : {}),
+            ...(s.icon ? { icon: s.icon } : {}),
+            ...(s.target !== '_blank' ? { target: s.target } : {}),
+            ...(!s.statusCheck ? { statusCheck: false } : {}),
+            ...(s.statusUrl ? { statusUrl: s.statusUrl } : {}),
+            ...(s.tags.length > 0 ? { tags: s.tags } : {}),
+          })),
+        })),
+      };
+    },
+
+    /**
+     * Übernimmt eine Konfigurationsdatei in einer Transaktion.
+     * replace: alles ersetzen. merge: Gruppen per Name, Services per Name innerhalb der Gruppe
+     * abgleichen (ohne Groß-/Kleinschreibung), Unbekanntes anhängen, nichts löschen.
+     */
+    importConfig(file: ParsedConfigFile, mode: ImportMode, dryRun = false): ImportSummary {
+      const summary: ImportSummary = {
+        groupsCreated: 0,
+        groupsUpdated: 0,
+        servicesCreated: 0,
+        servicesUpdated: 0,
+        groupsRemoved: 0,
+        servicesRemoved: 0,
+        titleChanged: false,
+      };
+      const key = (value: string) => value.trim().toLocaleLowerCase('de');
+      try {
+        db.transaction((tx) => {
+          if (file.title !== undefined && file.title !== this.getTitle()) {
+            summary.titleChanged = true;
+            tx.insert(settings)
+              .values({ key: 'title', value: file.title })
+              .onConflictDoUpdate({ target: settings.key, set: { value: file.title } })
+              .run();
+          }
+          if (mode === 'replace') {
+            summary.groupsRemoved = tx.select({ id: groups.id }).from(groups).all().length;
+            summary.servicesRemoved = tx.select({ id: services.id }).from(services).all().length;
+            tx.delete(services).run();
+            tx.delete(groups).run();
+          }
+          const existingGroups = new Map(
+            tx
+              .select()
+              .from(groups)
+              .all()
+              .map((row) => [key(row.name), row]),
+          );
+          let groupOrder =
+            (tx
+              .select({ value: max(groups.sortOrder) })
+              .from(groups)
+              .get()?.value ?? -1) + 1;
+
+          for (const entry of file.groups) {
+            const { services: entries, ...groupData } = entry;
+            let groupRow = existingGroups.get(key(groupData.name));
+            if (groupRow) {
+              tx.update(groups)
+                .set({ ...groupData, updatedAt: now })
+                .where(eq(groups.id, groupRow.id))
+                .run();
+              summary.groupsUpdated++;
+            } else {
+              groupRow = tx
+                .insert(groups)
+                .values({ ...groupData, sortOrder: groupOrder++ })
+                .returning()
+                .get();
+              existingGroups.set(key(groupData.name), groupRow);
+              summary.groupsCreated++;
+            }
+
+            const groupId = groupRow.id;
+            const existingServices = new Map(
+              tx
+                .select()
+                .from(services)
+                .where(eq(services.groupId, groupId))
+                .all()
+                .map((row) => [key(row.name), row]),
+            );
+            let serviceOrder =
+              (tx
+                .select({ value: max(services.sortOrder) })
+                .from(services)
+                .where(eq(services.groupId, groupId))
+                .get()?.value ?? -1) + 1;
+            for (const serviceData of entries) {
+              const current = existingServices.get(key(serviceData.name));
+              if (current) {
+                tx.update(services)
+                  .set({ ...serviceData, updatedAt: now })
+                  .where(eq(services.id, current.id))
+                  .run();
+                summary.servicesUpdated++;
+              } else {
+                const row = tx
+                  .insert(services)
+                  .values({ ...serviceData, groupId, sortOrder: serviceOrder++ })
+                  .returning()
+                  .get();
+                existingServices.set(key(serviceData.name), row);
+                summary.servicesCreated++;
+              }
+            }
+          }
+          if (dryRun) throw new DryRun();
+        });
+      } catch (error) {
+        if (!(error instanceof DryRun)) throw error;
+      }
+      return summary;
+    },
+
     /** Setzt Reihenfolge (und ggf. Gruppe) der übergebenen Services. */
     arrangeServices(groupId: number, ids: number[]): void {
       db.transaction((tx) => {
@@ -198,6 +331,9 @@ export function createRepository(db: Db) {
 export type Repository = ReturnType<typeof createRepository>;
 
 export class ValidationError extends Error {}
+
+/** Bricht die Transaktion bei einer Probe ab, damit nichts gespeichert wird. */
+class DryRun extends Error {}
 
 function assertSameIds(existing: number[], given: number[]) {
   const a = [...existing].sort((x, y) => x - y);

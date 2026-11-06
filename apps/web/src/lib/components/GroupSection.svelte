@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { DashboardGroup, Service, ServiceStatus } from '@ultimate-dash/shared';
+  import { dragHandle, dragHandleZone, type DndEvent } from 'svelte-dnd-action';
+  import { FLIP_MS, idsOf } from '$lib/dnd';
   import ServiceCard from './ServiceCard.svelte';
   import ServiceIcon from './ServiceIcon.svelte';
   import UiIcon from './UiIcon.svelte';
@@ -17,6 +19,8 @@
     oneditservice: (service: Service) => void;
     ondeleteservice: (service: Service) => void;
     onmoveservice: (service: Service, direction: -1 | 1) => void;
+    /** Neue Reihenfolge nach Drag-and-drop (auch aus anderen Gruppen hereingezogen). */
+    onarrangeservices: (ids: number[]) => void;
   }
 
   let props: Props = $props();
@@ -48,10 +52,35 @@
   );
   const checkedCount = $derived(group.services.filter((s) => s.statusCheck).length);
   const contentId = $derived(`group-${group.id}-content`);
+
+  // Lokale Kopie für Drag-and-drop; wird nach jedem Laden vom Server übernommen.
+  let items = $state.raw<Service[]>([]);
+  $effect(() => {
+    items = group.services;
+  });
+
+  function onconsider(event: CustomEvent<DndEvent<Service>>) {
+    items = event.detail.items;
+  }
+
+  function onfinalize(event: CustomEvent<DndEvent<Service>>) {
+    items = event.detail.items;
+    // Die abgebende Gruppe muss nichts speichern, nur die aufnehmende.
+    if (event.detail.info.trigger !== 'droppedIntoAnother') props.onarrangeservices(idsOf(items));
+  }
 </script>
 
 <section aria-labelledby="group-{group.id}-title" class="flex flex-col gap-3">
   <header class="flex items-center gap-2">
+    {#if props.editMode}
+      <span
+        use:dragHandle
+        class="-mr-1 grid h-8 w-5 shrink-0 cursor-grab place-items-center rounded text-fg-muted hover:text-fg active:cursor-grabbing"
+        aria-label="Gruppe {group.name} verschieben"
+      >
+        <UiIcon name="grip" size={16} />
+      </span>
+    {/if}
     <button
       type="button"
       class="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1 text-left"
@@ -122,24 +151,46 @@
 
   {#if !collapsed}
     <div id={contentId} class="grid gap-2">
-      {#each group.services as service, index (service.id)}
-        <ServiceCard
-          {service}
-          status={props.statuses[service.id]}
-          editMode={props.editMode}
-          canMoveUp={index > 0}
-          canMoveDown={index < group.services.length - 1}
-          onedit={() => props.oneditservice(service)}
-          ondelete={() => props.ondeleteservice(service)}
-          onmove={(direction) => props.onmoveservice(service, direction)}
-        />
-      {:else}
-        <p
-          class="rounded-xl border border-dashed border-line p-4 text-center text-sm text-fg-muted"
+      <div class="relative">
+        <div
+          class="grid min-h-14 gap-2"
+          aria-label="Services in {group.name}"
+          use:dragHandleZone={{
+            items,
+            type: 'service',
+            flipDurationMs: FLIP_MS,
+            dragDisabled: !props.editMode,
+            dropTargetStyle: {},
+            dropTargetClasses: ['drop-target'],
+            delayTouchStart: true,
+            useCursorForDetection: true,
+          }}
+          {onconsider}
+          {onfinalize}
         >
-          Noch keine Services in dieser Gruppe.
-        </p>
-      {/each}
+          {#each items as service, index (service.id)}
+            <ServiceCard
+              {service}
+              status={props.statuses[service.id]}
+              editMode={props.editMode}
+              canMoveUp={index > 0}
+              canMoveDown={index < items.length - 1}
+              onedit={() => props.oneditservice(service)}
+              ondelete={() => props.ondeleteservice(service)}
+              onmove={(direction) => props.onmoveservice(service, direction)}
+            />
+          {/each}
+        </div>
+        {#if items.length === 0}
+          <p
+            class="pointer-events-none absolute inset-0 grid place-items-center rounded-xl border border-dashed border-line p-4 text-center text-sm text-fg-muted"
+          >
+            {props.editMode
+              ? 'Services hierher ziehen oder hinzufügen.'
+              : 'Noch keine Services in dieser Gruppe.'}
+          </p>
+        {/if}
+      </div>
       {#if props.editMode}
         <button type="button" class="btn border-dashed" onclick={props.onaddservice}>
           <UiIcon name="plus" size={16} /> Service hinzufügen

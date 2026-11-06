@@ -88,3 +88,35 @@ Im Icon-Feld eines Services oder einer Gruppe:
 - eine Bild-URL
 
 Ohne Icon zeigt das Dashboard farbige Initialen.
+
+Über **Durchsuchen** im Formular öffnet sich eine Liste aller Dashboard Icons und selfh.st Icons (rund 12.000) mit Suchfeld; Material Design Icons und Simple Icons werden beim Tippen über Iconify gesucht. Die Icon-Listen lädt der Server einmal täglich von jsDelivr (Ausweichquelle: GitHub) und legt sie unter `/data/cache` ab, damit die Auswahl auch bei Ausfällen funktioniert. Icons, die es nur als PNG gibt, tragen die Endung im Namen (z. B. `di:beispiel.png`).
+
+## Bedienung im Bearbeiten-Modus
+
+- **Verschieben:** Gruppen und Services am Griff (⠿) ziehen, Services auch in andere Gruppen. Per Tastatur: Griff fokussieren, Leertaste, Pfeiltasten, Leertaste. Auf Touchgeräten kurz gedrückt halten.
+- **Tags:** aus den bereits verwendeten Tags wählen oder neue eingeben und mit Enter übernehmen.
+
+## Export und Import
+
+Im Benutzermenü (nur Admins) lässt sich die Konfiguration als YAML herunterladen und wieder einlesen. Vor dem Import zeigt eine Vorschau, was angelegt, aktualisiert oder entfernt wird.
+
+- **Zusammenführen:** Gruppen und Services mit gleichem Namen werden aktualisiert, neue ergänzt, nichts gelöscht.
+- **Ersetzen:** alles Bestehende wird durch die Datei ersetzt.
+
+```yaml
+version: 1
+title: Mein Homelab
+groups:
+  - name: Infrastruktur
+    services:
+      - name: Proxmox
+        url: https://pve.home.lan:8006
+        icon: di:proxmox
+        tags: [vm, homelab]
+      - name: Technitium
+        url: http://10.10.0.53:5380
+        icon: sh:technitium
+        statusCheck: false
+```
+
+Weitere Felder pro Service: `description`, `target` (`_blank` oder `_self`), `statusUrl`; pro Gruppe: `icon`, `collapsed`. Benutzer und Passwörter sind nicht Teil der Datei.

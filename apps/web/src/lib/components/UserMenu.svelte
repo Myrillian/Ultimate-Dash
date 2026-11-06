@@ -3,10 +3,12 @@
   import PasswordDialog from './PasswordDialog.svelte';
   import UiIcon from './UiIcon.svelte';
   import UsersDialog from './UsersDialog.svelte';
+  import ImportDialog from './ImportDialog.svelte';
 
   let open = $state(false);
   let passwordOpen = $state(false);
   let usersOpen = $state(false);
+  let importOpen = $state(false);
   let root: HTMLDivElement | undefined = $state();
   let trigger: HTMLButtonElement | undefined = $state();
 
@@ -80,8 +82,22 @@
               <UiIcon name="users" size={16} /> Benutzer verwalten
             </button>
           </li>
+          <li class="mt-1 border-t border-line pt-1">
+            <a href="/api/config/export" download class="menu-item" onclick={() => close()}>
+              <UiIcon name="download" size={16} /> Konfiguration exportieren
+            </a>
+          </li>
+          <li>
+            <button
+              type="button"
+              class="menu-item"
+              onclick={() => choose(() => (importOpen = true))}
+            >
+              <UiIcon name="upload" size={16} /> Konfiguration importieren
+            </button>
+          </li>
         {/if}
-        <li>
+        <li class="mt-1 border-t border-line pt-1">
           <button type="button" class="menu-item" onclick={() => choose(() => void auth.logout())}>
             <UiIcon name="logout" size={16} /> Abmelden
           </button>
@@ -94,6 +110,7 @@
 <PasswordDialog open={passwordOpen} onclose={() => (passwordOpen = false)} />
 {#if auth.isAdmin}
   <UsersDialog open={usersOpen} onclose={() => (usersOpen = false)} />
+  <ImportDialog open={importOpen} onclose={() => (importOpen = false)} />
 {/if}
 
 <style>

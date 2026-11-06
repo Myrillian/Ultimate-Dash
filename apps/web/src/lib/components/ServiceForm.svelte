@@ -2,7 +2,9 @@
   import type { DashboardGroup, Service, ServiceInput } from '@ultimate-dash/shared';
   import { ApiError } from '$lib/api';
   import Dialog from './Dialog.svelte';
+  import IconPicker from './IconPicker.svelte';
   import ServiceIcon from './ServiceIcon.svelte';
+  import TagInput from './TagInput.svelte';
 
   interface Props {
     open: boolean;
@@ -25,10 +27,21 @@
     target: '_blank' as const,
     statusCheck: true,
     statusUrl: '',
-    tags: '',
+    tags: [] as string[],
   });
 
   let form = $state(empty());
+
+  /** Alle bereits verwendeten Tags als Vorschläge, häufigste zuerst. */
+  const allTags = $derived.by(() => {
+    const counts = new Map<string, number>();
+    for (const group of groups)
+      for (const item of group.services)
+        for (const tag of item.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    return [...counts]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'de'))
+      .map(([t]) => t);
+  });
   let errors = $state<Record<string, string>>({});
   let saving = $state(false);
   let generalError = $state<string | null>(null);
@@ -48,7 +61,7 @@
           target: service.target as '_blank',
           statusCheck: service.statusCheck,
           statusUrl: service.statusUrl ?? '',
-          tags: service.tags.join(', '),
+          tags: [...service.tags],
         }
       : empty();
   });
@@ -68,10 +81,7 @@
         target: form.target,
         statusCheck: form.statusCheck,
         statusUrl: form.statusUrl.trim() === '' ? null : form.statusUrl.trim(),
-        tags: form.tags
-          .split(',')
-          .map((tag) => tag.trim())
-          .filter(Boolean),
+        tags: form.tags,
       });
     } catch (error) {
       if (error instanceof ApiError && error.issues.length > 0) errors = error.fieldErrors();
@@ -149,27 +159,15 @@
       <label class="field-label" for="svc-icon"
         >Icon <span class="text-fg-muted">(optional)</span></label
       >
-      <input
-        id="svc-icon"
-        class="input"
-        placeholder="di:proxmox, sh:technitium, mdi:server oder https://…"
-        bind:value={form.icon}
-        aria-describedby="svc-icon-hint"
-      />
-      <p id="svc-icon-hint" class="field-hint">
-        <code>di:</code> Dashboard Icons, <code>sh:</code> selfh.st, <code>mdi:</code>/<code
-          >simple-icons:</code
-        >
-        Iconify oder eine Bild-URL.
-      </p>
+      <IconPicker id="svc-icon" bind:value={form.icon} name={form.name} />
     </div>
 
     <div>
       <label class="field-label" for="svc-tags"
         >Tags <span class="text-fg-muted">(optional)</span></label
       >
-      <input id="svc-tags" class="input" placeholder="dns, dhcp" bind:value={form.tags} />
-      <p class="field-hint">Mit Komma trennen. Tags werden bei der Suche berücksichtigt.</p>
+      <TagInput id="svc-tags" bind:value={form.tags} suggestions={allTags} />
+      {#if errors.tags}<p class="field-error">{errors.tags}</p>{/if}
     </div>
 
     <fieldset class="grid gap-3 rounded-xl border border-line p-3">

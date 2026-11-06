@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Service, ServiceStatus } from '@ultimate-dash/shared';
+  import { dragHandle } from 'svelte-dnd-action';
   import ServiceIcon from './ServiceIcon.svelte';
   import StatusDot from './StatusDot.svelte';
   import UiIcon from './UiIcon.svelte';
@@ -45,6 +46,15 @@
   class:ring-2={active}
   class:ring-accent={active}
 >
+  {#if editMode}
+    <span
+      use:dragHandle
+      class="relative z-10 -mr-1 -ml-1 grid h-9 w-5 shrink-0 cursor-grab place-items-center rounded text-fg-muted hover:text-fg active:cursor-grabbing"
+      aria-label="{service.name} verschieben"
+    >
+      <UiIcon name="grip" size={16} />
+    </span>
+  {/if}
   <ServiceIcon icon={service.icon} name={service.name} />
   <div class="min-w-0 flex-1">
     <div class="flex items-center gap-2">

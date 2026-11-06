@@ -1,9 +1,17 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Group, GroupInput, Service, ServiceInput } from '@ultimate-dash/shared';
+  import type {
+    DashboardGroup,
+    Group,
+    GroupInput,
+    Service,
+    ServiceInput,
+  } from '@ultimate-dash/shared';
   import { api, ApiError } from '$lib/api';
   import { auth } from '$lib/auth.svelte';
   import { dashboard } from '$lib/dashboard.svelte';
+  import { FLIP_MS, idsOf } from '$lib/dnd';
+  import { dragHandleZone, type DndEvent } from 'svelte-dnd-action';
   import { searchServices } from '$lib/search';
   import { theme } from '$lib/theme.svelte';
   import { toasts } from '$lib/toasts.svelte';
@@ -43,6 +51,23 @@
   });
 
   const groups = $derived(dashboard.data?.groups ?? []);
+
+  // Lokale Reihenfolge für Drag-and-drop der Gruppen
+  let groupItems = $state.raw<DashboardGroup[]>([]);
+  $effect(() => {
+    groupItems = groups;
+  });
+
+  function onGroupsConsider(event: CustomEvent<DndEvent<DashboardGroup>>) {
+    groupItems = event.detail.items;
+  }
+
+  function onGroupsFinalize(event: CustomEvent<DndEvent<DashboardGroup>>) {
+    groupItems = event.detail.items;
+    void run(() => api.reorderGroups(idsOf(groupItems)), 'Reihenfolge gespeichert').catch(
+      () => undefined,
+    );
+  }
   const hits = $derived(searchServices(groups, query));
   const searching = $derived(query.trim().length > 0);
 
@@ -286,14 +311,28 @@
         {/if}
       </div>
     {:else}
-      <div class="grid gap-x-6 gap-y-8 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {#each groups as group, index (group.id)}
+      <div
+        class="grid gap-x-6 gap-y-8 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+        aria-label="Gruppen"
+        use:dragHandleZone={{
+          items: groupItems,
+          type: 'group',
+          flipDurationMs: FLIP_MS,
+          dragDisabled: !editMode,
+          dropTargetStyle: {},
+          delayTouchStart: true,
+          useCursorForDetection: true,
+        }}
+        onconsider={onGroupsConsider}
+        onfinalize={onGroupsFinalize}
+      >
+        {#each groupItems as group, index (group.id)}
           <GroupSection
             {group}
             statuses={dashboard.statuses}
             {editMode}
             isFirst={index === 0}
-            isLast={index === groups.length - 1}
+            isLast={index === groupItems.length - 1}
             onaddservice={() => (serviceDialog = { open: true, service: null, groupId: group.id })}
             oneditgroup={() => (groupDialog = { open: true, group })}
             ondeletegroup={() =>
@@ -321,9 +360,15 @@
                   api.arrangeServices(group.id, moveItem(group.services, service.id, direction)),
                 'Reihenfolge gespeichert',
               ).catch(() => undefined)}
+            onarrangeservices={(ids) =>
+              void run(() => api.arrangeServices(group.id, ids), 'Reihenfolge gespeichert').catch(
+                () => undefined,
+              )}
           />
         {/each}
-        {#if editMode}
+      </div>
+      {#if editMode}
+        <div class="mt-8 grid gap-x-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           <button
             type="button"
             class="flex min-h-32 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line text-fg-muted transition hover:border-accent hover:text-accent"
@@ -331,8 +376,8 @@
           >
             <UiIcon name="plus" size={22} /> Gruppe hinzufügen
           </button>
-        {/if}
-      </div>
+        </div>
+      {/if}
     {/if}
   </main>
 </div>

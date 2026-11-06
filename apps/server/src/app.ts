@@ -2,7 +2,7 @@ import Fastify, { type FastifyServerOptions } from 'fastify';
 import fastifyCookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { ZodError } from 'zod';
 import type { AppConfig } from './config.js';
 import { openDatabase } from './db/client.js';
@@ -12,12 +12,19 @@ import { registerAuthGuard } from './auth/guard.js';
 import { LoginRateLimiter } from './auth/rate-limit.js';
 import { authRoutes } from './auth/routes.js';
 import { createAuthStore } from './auth/store.js';
+import { IconCatalogService } from './icons/catalog.js';
 import { apiRoutes } from './routes/api.js';
+import { configRoutes } from './routes/config.js';
+import { iconRoutes } from './routes/icons.js';
 import { StatusMonitor } from './status/monitor.js';
 
 export async function buildApp(
   config: AppConfig,
-  options: { logger?: FastifyServerOptions['logger']; startMonitor?: boolean } = {},
+  options: {
+    logger?: FastifyServerOptions['logger'];
+    startMonitor?: boolean;
+    icons?: IconCatalogService;
+  } = {},
 ) {
   const app = Fastify({
     logger: options.logger ?? { level: config.logLevel },
@@ -67,6 +74,17 @@ export async function buildApp(
     limiter: new LoginRateLimiter(),
   });
   await app.register(apiRoutes, { prefix: '/api', repo, events, monitor });
+  const icons =
+    options.icons ??
+    new IconCatalogService({
+      cacheFile:
+        config.databaseFile === ':memory:'
+          ? null
+          : join(dirname(config.databaseFile), 'cache', 'icon-catalog.json'),
+      onError: (error) => app.log.warn({ err: error }, 'Icon-Verzeichnis nicht abrufbar'),
+    });
+  await app.register(iconRoutes, { prefix: '/api', icons });
+  await app.register(configRoutes, { prefix: '/api', repo, events });
 
   if (config.webRoot && existsSync(config.webRoot)) {
     await app.register(fastifyStatic, {
