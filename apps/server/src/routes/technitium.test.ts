@@ -151,6 +151,8 @@ describe('Technitium-Verbindung', () => {
       ['technitium.blocking.pause', true],
       ['technitium.connect', true],
     ]);
+    expect((await call('GET', '/api/audit?limit=2')).json<AuditEntry[]>()).toHaveLength(2);
+    expect((await call('GET', '/api/audit?limit=0')).statusCode).toBe(400);
     expect(log[0]).toMatchObject({ username: 'admin' });
   });
 

@@ -159,7 +159,7 @@ export const api = {
     request<void>('POST', '/technitium/dhcp/reservations/delete', input),
   dhcpLeaseAction: (input: DhcpLeaseAction) =>
     request<void>('POST', '/technitium/dhcp/leases/action', input),
-  audit: () => request<AuditEntry[]>('GET', '/audit'),
+  audit: (limit = 500) => request<AuditEntry[]>('GET', `/audit?limit=${limit}`),
 
   views: (scope: ViewScope) => request<SavedView[]>('GET', `/views?scope=${scope}`),
   saveView: (input: SavedViewInput) => request<SavedView>('PUT', '/views', input),

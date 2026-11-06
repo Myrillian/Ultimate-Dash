@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Listen, für die jeder Benutzer Ansichten (Suche, Filter, Sortierung, Spalten) speichern kann. */
-export const viewScopes = ['ipam', 'dns'] as const;
+export const viewScopes = ['ipam', 'dns', 'audit'] as const;
 export type ViewScope = (typeof viewScopes)[number];
 
 export const savedViewInput = z.object({

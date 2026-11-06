@@ -90,7 +90,7 @@ describe('Gespeicherte Ansichten', () => {
 
   it('lehnt ungültige Eingaben und Anonyme ab', async () => {
     expect((await call(admin, 'PUT', '/api/views', { ...view, name: ' ' })).statusCode).toBe(400);
-    expect((await call(admin, 'PUT', '/api/views', { ...view, scope: 'audit' })).statusCode).toBe(
+    expect((await call(admin, 'PUT', '/api/views', { ...view, scope: 'dhcp' })).statusCode).toBe(
       400,
     );
     expect((await ctx.app.inject({ method: 'GET', url: '/api/views?scope=ipam' })).statusCode).toBe(

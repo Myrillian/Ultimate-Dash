@@ -111,7 +111,7 @@ export const savedViews = sqliteTable(
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    scope: text('scope', { enum: ['ipam', 'dns'] }).notNull(),
+    scope: text('scope', { enum: ['ipam', 'dns', 'audit'] }).notNull(),
     name: text('name').notNull(),
     params: text('params', { mode: 'json' }).$type<Record<string, string>>().notNull(),
     hidden: text('hidden', { mode: 'json' }).$type<string[]>().notNull(),
