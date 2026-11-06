@@ -54,3 +54,13 @@ export function formatDuration(totalMinutes: number): string {
   ].filter(Boolean);
   return parts.join(' ') || '0 Min.';
 }
+
+/** „gerade eben“, „vor 5 Min.“, „vor 3 Std.“, „vor 2 Tagen“ für einen ISO-Zeitpunkt. */
+export function formatAgo(iso: string, now = Date.now()): string {
+  const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60_000));
+  if (minutes < 1) return 'gerade eben';
+  if (minutes < 60) return `vor ${minutes} Min.`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `vor ${hours} Std.`;
+  return `vor ${Math.round(hours / 24)} Tagen`;
+}

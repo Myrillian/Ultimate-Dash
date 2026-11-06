@@ -9,6 +9,8 @@ const network: IpamNetwork = {
   vlanId: null,
   gateway: '10.0.0.1',
   description: null,
+  scan: true,
+  lastScanAt: null,
 };
 const categories: IpamCategory[] = [{ id: 1, name: 'Server', color: 'blue', description: null }];
 const ranges: IpamRange[] = [
@@ -37,23 +39,38 @@ const usage: IpamNetworkUsage = {
   addresses: [
     {
       address: '10.0.0.2',
-      claims: [{ source: 'dns', mac: null, name: 'a', scope: null }],
+      type: 'static',
+      alive: null,
+      lastSeen: null,
+      discovered: false,
+      claims: [{ source: 'dns', mac: null, name: 'a', scope: null, hostId: null }],
       conflict: false,
     },
     {
       address: '10.0.0.3',
-      claims: [{ source: 'reservation', mac: 'AA', name: 'b', scope: 'LAN' }],
+      type: 'reservation',
+      alive: null,
+      lastSeen: null,
+      discovered: false,
+      claims: [{ source: 'reservation', mac: 'AA', name: 'b', scope: 'LAN', hostId: null }],
       conflict: false,
     },
     {
       address: '10.0.0.4',
-      claims: [{ source: 'lease', mac: 'AA', name: 'c', scope: 'LAN' }],
+      type: 'lease',
+      alive: null,
+      lastSeen: null,
+      discovered: false,
+      claims: [{ source: 'lease', mac: 'AA', name: 'c', scope: 'LAN', hostId: null }],
       conflict: true,
     },
   ],
   rangeUse: {},
   unassignedUsed: 0,
   conflicts: 1,
+  discovered: 0,
+  online: 0,
+  lastScanAt: null,
 };
 
 describe('buildCells', () => {
@@ -65,7 +82,7 @@ describe('buildCells', () => {
     expect(kind('10.0.0.0')).toBe('network');
     expect(kind('10.0.0.15')).toBe('broadcast');
     expect(kind('10.0.0.1')).toBe('gateway');
-    expect(kind('10.0.0.2')).toBe('used');
+    expect(kind('10.0.0.2')).toBe('static');
     expect(kind('10.0.0.3')).toBe('reserved');
     expect(kind('10.0.0.4')).toBe('conflict');
   });

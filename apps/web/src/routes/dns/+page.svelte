@@ -2,13 +2,15 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import type { DnsRecord, DnsRecordList, DnsZone } from '@ultimate-dash/shared';
+  import type { DnsRecord, DnsRecordList, DnsZone, IpamReachability } from '@ultimate-dash/shared';
+  import { ipv4ToInt, parseCidr } from '@ultimate-dash/shared';
   import { api, ApiError } from '$lib/api';
   import { auth } from '$lib/auth.svelte';
   import { relativeName, type RecordFormValues } from '$lib/dns-records';
   import { theme } from '$lib/theme.svelte';
   import { toasts } from '$lib/toasts.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import ReachDot from '$lib/components/ReachDot.svelte';
   import RecordForm from '$lib/components/RecordForm.svelte';
   import TechNav from '$lib/components/TechNav.svelte';
   import UiIcon from '$lib/components/UiIcon.svelte';
@@ -92,7 +94,31 @@
       void loadRecords(selected);
     }
   });
-  onMount(() => void loadZones());
+  onMount(() => {
+    void loadZones();
+    // Erreichbarkeit aus dem IPAM; fehlt sie, zeigt die Tabelle einfach keinen Punkt.
+    void api
+      .ipamReachability()
+      .then((r) => (reach = r))
+      .catch(() => {});
+  });
+
+  let reach = $state<IpamReachability | null>(null);
+
+  /** Antwort auf Ping für die Adresse eines A-Eintrags; null, wenn sie in keinem geprüften Netz liegt. */
+  function aliveFor(record: DnsRecord): { alive: boolean; lastSeen: string | null } | null {
+    if (!reach || record.data?.type !== 'A') return null;
+    const host = reach.hosts[record.data.ipAddress];
+    if (host) return host;
+    const n = ipv4ToInt(record.data.ipAddress);
+    const inScanned =
+      n !== null &&
+      reach.scanned.some((cidr) => {
+        const c = parseCidr(cidr);
+        return !!c && n > c.first && n < c.last;
+      });
+    return inScanned ? { alive: false, lastSeen: null } : null;
+  }
 
   async function save(values: RecordFormValues) {
     const current = form.record;
@@ -278,9 +304,15 @@
                         >
                       </td>
                       <td class="max-w-md px-2 py-2">
-                        <span class="block truncate font-mono text-[13px]" title={record.display}
-                          >{record.display}</span
-                        >
+                        <span class="flex items-center gap-2">
+                          <span class="block truncate font-mono text-[13px]" title={record.display}
+                            >{record.display}</span
+                          >
+                          {#if aliveFor(record)}
+                            {@const r = aliveFor(record)!}
+                            <ReachDot alive={r.alive} lastSeen={r.lastSeen} />
+                          {/if}
+                        </span>
                         {#if record.comments || record.disabled}
                           <span class="block truncate text-xs text-fg-muted">
                             {record.disabled ? 'deaktiviert' : ''}{record.disabled &&

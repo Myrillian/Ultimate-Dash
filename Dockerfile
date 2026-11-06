@@ -21,6 +21,9 @@ ENV NODE_ENV=production \
     PORT=3000 \
     DATA_DIR=/data \
     WEB_ROOT=/app/web
+# iputils-ping: für die Ping-Prüfung im IPAM
+RUN apt-get update && apt-get install -y --no-install-recommends iputils-ping \
+ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /out ./
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh

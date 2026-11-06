@@ -9,6 +9,7 @@
     vlanId: string;
     gateway: string;
     description: string;
+    scan: boolean;
   }
 
   interface Props {
@@ -21,6 +22,7 @@
       vlanId: number | null;
       gateway: string;
       description: string;
+      scan: boolean;
     }) => Promise<void>;
   }
   let { open, existing = null, onclose, onsubmit }: Props = $props();
@@ -31,6 +33,7 @@
     vlanId: '',
     gateway: '',
     description: '',
+    scan: true,
   });
   let errors = $state<Record<string, string>>({});
   let general = $state<string | null>(null);
@@ -47,8 +50,9 @@
           vlanId: existing.vlanId?.toString() ?? '',
           gateway: existing.gateway ?? '',
           description: existing.description ?? '',
+          scan: existing.scan,
         }
-      : { name: '', cidr: '', vlanId: '', gateway: '', description: '' };
+      : { name: '', cidr: '', vlanId: '', gateway: '', description: '', scan: true };
   });
 
   async function submit(event: SubmitEvent) {
@@ -132,6 +136,15 @@
       <label class="field-label" for="net-desc">Beschreibung</label>
       <input id="net-desc" class="input" bind:value={values.description} />
     </div>
+    <label class="flex items-start gap-2 text-sm">
+      <input type="checkbox" class="mt-0.5" bind:checked={values.scan} />
+      <span>
+        Per Ping prüfen
+        <span class="block text-xs text-fg-muted"
+          >Zeigt, ob Geräte erreichbar sind, und entdeckt unbekannte. Nur bis /22.</span
+        >
+      </span>
+    </label>
   </form>
   {#snippet footer()}
     <button type="button" class="btn" onclick={onclose}>Abbrechen</button>

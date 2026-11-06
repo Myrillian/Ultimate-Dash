@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ReachDot from './ReachDot.svelte';
   import { categoryColor, cellKindLabel, type Cell, type CellKind } from '$lib/ipam';
 
   let { cells, label, onpick }: { cells: Cell[]; label: string; onpick?: (cell: Cell) => void } =
@@ -8,9 +9,21 @@
   const columns = $derived(cells.length > 256 ? 32 : 16);
   const current = $derived(active === null ? null : (cells[active] ?? null));
 
+  /** Neu entdeckte Geräte tragen einen Ring in der Hervorhebungsfarbe, Offline-Adressen sind abgeblendet. */
   function style(cell: Cell): string {
+    const base = baseStyle(cell);
+    const extra: string[] = [];
+    if (cell.usage?.discovered)
+      extra.push('box-shadow:inset 0 0 0 2px var(--bg-elevated),0 0 0 2px var(--discovered)');
+    if (cell.usage?.alive === false && !cell.usage.discovered) extra.push('opacity:0.5');
+    return [base, ...extra].filter(Boolean).join(';');
+  }
+
+  function baseStyle(cell: Cell): string {
     const color = cell.category ? categoryColor(cell.category.color) : null;
     switch (cell.kind) {
+      case 'static':
+        return `background:${color ?? 'var(--text-muted)'}`;
       case 'used':
         return `background:${color ?? 'var(--text-muted)'}`;
       case 'reserved':
@@ -29,7 +42,14 @@
     }
   }
 
-  const legend: CellKind[] = ['used', 'reserved', 'conflict', 'pool', 'free', 'gateway'];
+  const claimLabel = {
+    dns: 'DNS',
+    reservation: 'Reservierung',
+    lease: 'Lease',
+    discovered: 'Per Ping entdeckt',
+    manual: 'Von Hand bestätigt',
+  } as const;
+  const legend: CellKind[] = ['used', 'reserved', 'static', 'conflict', 'pool', 'free', 'gateway'];
   const sample = (kind: CellKind): Cell => ({
     address: '',
     kind,
@@ -38,7 +58,7 @@
     usage: null,
   });
 
-  const glyph: Partial<Record<CellKind, string>> = { conflict: '!', gateway: 'G' };
+  const glyph: Partial<Record<CellKind, string>> = { conflict: '!', gateway: 'G', static: 'S' };
 
   function onKeydown(event: KeyboardEvent) {
     const moves: Record<string, number> = {
@@ -99,6 +119,17 @@
         {cellKindLabel[kind]}
       </li>
     {/each}
+    <li class="flex items-center gap-1.5">
+      <span
+        class="size-3 rounded-[3px] bg-text-muted"
+        style="background:var(--text-muted);box-shadow:inset 0 0 0 2px var(--bg-elevated),0 0 0 2px var(--discovered)"
+      ></span>
+      Entdeckt
+    </li>
+    <li class="flex items-center gap-1.5">
+      <span class="size-3 rounded-[3px] opacity-50" style="background:var(--text-muted)"></span>
+      Antwortet nicht
+    </li>
   </ul>
 
   <div class="min-h-10 text-sm" aria-live="polite">
@@ -108,6 +139,12 @@
         <span class="text-fg-muted">
           {cellKindLabel[current.kind]}{current.category ? ` · ${current.category.name}` : ''}
         </span>
+        {#if current.usage}
+          <ReachDot alive={current.usage.alive} lastSeen={current.usage.lastSeen} />
+          {#if current.usage.discovered}
+            <span class="text-xs font-semibold" style="color: var(--discovered)">Neu entdeckt</span>
+          {/if}
+        {/if}
       </p>
       {#if current.usage}
         <ul class="mt-0.5 text-xs text-fg-muted">

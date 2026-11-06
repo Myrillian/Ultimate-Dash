@@ -104,6 +104,8 @@ export const ipamNetworks = sqliteTable('ipam_networks', {
   vlanId: integer('vlan_id'),
   gateway: text('gateway'),
   description: text('description'),
+  scan: integer('scan', { mode: 'boolean' }).notNull().default(true),
+  lastScanAt: text('last_scan_at'),
   sortOrder: integer('sort_order').notNull().default(0),
   ...timestamps,
 });
@@ -135,3 +137,16 @@ export const ipamRanges = sqliteTable(
   },
   (table) => [index('ipam_ranges_network_idx').on(table.networkId)],
 );
+
+/** Per Ping gefundene oder bestätigte Geräte; Erreichbarkeit und Zeitpunkte. */
+export const ipamHosts = sqliteTable('ipam_hosts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  address: text('address').notNull().unique(),
+  name: text('name'),
+  /** false = neu entdeckt und hervorgehoben, true = vom Admin als bekannt bestätigt */
+  acknowledged: integer('acknowledged', { mode: 'boolean' }).notNull().default(false),
+  alive: integer('alive', { mode: 'boolean' }).notNull().default(true),
+  firstSeenAt: text('first_seen_at').notNull(),
+  lastSeenAt: text('last_seen_at'),
+  lastCheckedAt: text('last_checked_at').notNull(),
+});

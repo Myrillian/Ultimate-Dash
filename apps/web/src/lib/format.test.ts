@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatCount,
+  formatAgo,
   formatDuration,
   formatPercent,
   formatRemaining,
@@ -40,5 +41,15 @@ describe('Zahlenformate', () => {
     expect(formatDuration(90)).toBe('1 Std. 30 Min.');
     expect(formatDuration(2880)).toBe('2 Tage');
     expect(formatDuration(0)).toBe('0 Min.');
+  });
+});
+
+describe('formatAgo', () => {
+  const now = new Date('2026-11-06T12:00:00Z').getTime();
+  it('formuliert relative Zeiten', () => {
+    expect(formatAgo('2026-11-06T11:59:50Z', now)).toBe('gerade eben');
+    expect(formatAgo('2026-11-06T11:55:00Z', now)).toBe('vor 5 Min.');
+    expect(formatAgo('2026-11-06T09:00:00Z', now)).toBe('vor 3 Std.');
+    expect(formatAgo('2026-11-02T12:00:00Z', now)).toBe('vor 4 Tagen');
   });
 });
