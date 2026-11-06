@@ -8,6 +8,7 @@ import {
   type IpamAddressUsage,
   type IpamClaim,
   type IpamData,
+  type IpamIpDetail,
   type IpamNetworkUsage,
   type IpamUsage,
 } from '@ultimate-dash/shared';
@@ -24,7 +25,11 @@ export interface UsageSources {
 
 interface Snapshot {
   scopes: DhcpScope[];
+  leases: DhcpLease[];
+  zones: DnsZone[];
   claims: Map<number, IpamClaim[]>;
+  /** A-Einträge je Adresse */
+  forward: Map<number, { zone: string; domain: string; ttl: number; comment: string | null }[]>;
 }
 
 const CACHE_MS = 15_000;
@@ -113,9 +118,10 @@ export class IpamUsageService {
     const lists = await Promise.all(
       zones.filter(holdsAddresses).map((zone) => this.sources.records(zone.name).catch(() => null)),
     );
+    const forward: Snapshot['forward'] = new Map();
     for (const list of lists)
       for (const record of list?.records ?? [])
-        if (record.type === 'A' && !record.disabled && record.data?.type === 'A')
+        if (record.type === 'A' && !record.disabled && record.data?.type === 'A') {
           add(record.data.ipAddress, {
             source: 'dns',
             mac: null,
@@ -123,8 +129,146 @@ export class IpamUsageService {
             scope: null,
             hostId: null,
           });
+          const key = ipv4ToInt(record.data.ipAddress);
+          if (key !== null)
+            forward.set(key, [
+              ...(forward.get(key) ?? []),
+              {
+                zone: list!.zone.name,
+                domain: record.domain,
+                ttl: record.ttl,
+                comment: record.comments,
+              },
+            ]);
+        }
 
-    return { scopes, claims };
+    return { scopes, leases, zones, claims, forward };
+  }
+
+  /**
+   * Alles zu einer Adresse für das Seitenfenster. Die Adresse muss in einem Netz liegen,
+   * sonst `null`. Wirft bei Technitium-Fehlern wie `usage` nicht, sondern meldet sie als Fehler.
+   */
+  async detail(data: IpamData, address: string): Promise<IpamIpDetail | null> {
+    const ip = ipv4ToInt(address);
+    if (ip === null) return null;
+    const network = data.networks.find((n) => {
+      const cidr = parseCidr(n.cidr)!;
+      return ip > cidr.first && ip < cidr.last;
+    });
+    if (!network) return null;
+    const snapshot = await this.load();
+
+    const host = this.hosts().find((h) => ipv4ToInt(h.address) === ip);
+    const known = snapshot.claims.get(ip) ?? [];
+    const isDiscovered = !!host && !host.acknowledged && known.length === 0;
+    const claims = [...known];
+    if (host && (host.acknowledged || known.length === 0))
+      claims.push({
+        source: host.acknowledged ? 'manual' : 'discovered',
+        mac: null,
+        name: host.name,
+        scope: null,
+        hostId: host.id,
+      });
+    const macs = new Set(
+      claims.map((c) => c.mac?.replace(/[:-]/g, '').toLowerCase()).filter(Boolean),
+    );
+    const scanned = network.scan && network.lastScanAt !== null;
+    const range = data.ranges.find(
+      (r) =>
+        r.networkId === network.id &&
+        ip >= ipv4ToInt(r.startAddress)! &&
+        ip <= ipv4ToInt(r.endAddress)!,
+    );
+
+    // DHCP
+    const scope = snapshot.scopes.find((s) => {
+      const a = ipv4ToInt(s.startingAddress);
+      const b = ipv4ToInt(s.endingAddress);
+      return a !== null && b !== null && ip >= a && ip <= b;
+    });
+    const reservationScope = snapshot.scopes.find((s) =>
+      s.reservations.some((r) => ipv4ToInt(r.address) === ip),
+    );
+    const reservation = reservationScope?.reservations.find((r) => ipv4ToInt(r.address) === ip);
+    const lease = snapshot.leases.find(
+      (l) => ipv4ToInt(l.address) === ip && !(l.type === 'Reserved' && reservation),
+    );
+
+    // DNS: Reverse-Zone mit dem längsten passenden Namen
+    const ptrName = `${address.split('.').reverse().join('.')}.in-addr.arpa`;
+    const reverseZone = snapshot.zones
+      .filter((z) => !z.disabled && ptrName.endsWith(`.${z.name.toLowerCase()}`))
+      .sort((a, b) => b.name.length - a.name.length)[0];
+    let reverse: IpamIpDetail['dns']['reverse'] = null;
+    if (reverseZone) {
+      const list = await this.sources.records(reverseZone.name).catch(() => null);
+      const ptr = list?.records.find(
+        (r) => r.type === 'PTR' && r.domain.toLowerCase() === ptrName && !r.disabled,
+      );
+      if (ptr)
+        reverse = { zone: reverseZone.name, domain: ptr.domain, target: ptr.display, ttl: ptr.ttl };
+    }
+
+    const type: IpamIpDetail['type'] =
+      claims.length === 0
+        ? null
+        : claims.some((c) => c.source === 'reservation')
+          ? 'reservation'
+          : claims.some((c) => c.source === 'lease')
+            ? 'lease'
+            : 'static';
+    return {
+      address,
+      networkId: network.id,
+      rangeId: range?.id ?? null,
+      categoryId: range?.categoryId ?? null,
+      state: claims.length === 0 ? 'free' : 'used',
+      type,
+      discovered: isDiscovered,
+      conflict: macs.size > 1,
+      alive: host ? host.alive : scanned ? false : null,
+      lastSeen: host?.lastSeenAt ?? null,
+      hostId: host?.id ?? null,
+      hostName: host?.name ?? null,
+      dhcp: {
+        pool: scope
+          ? {
+              scope: scope.name,
+              enabled: scope.enabled,
+              excluded: scope.exclusions.some((x) => {
+                const a = ipv4ToInt(x.startingAddress);
+                const b = ipv4ToInt(x.endingAddress);
+                return a !== null && b !== null && ip >= a && ip <= b;
+              }),
+            }
+          : null,
+        reservation:
+          reservation && reservationScope
+            ? {
+                scope: reservationScope.name,
+                mac: reservation.hardwareAddress,
+                hostName: reservation.hostName,
+                comment: reservation.comments,
+              }
+            : null,
+        lease: lease
+          ? {
+              scope: lease.scope,
+              mac: lease.hardwareAddress,
+              hostName: lease.hostName,
+              obtained: lease.obtained,
+              expires: lease.expires,
+            }
+          : null,
+      },
+      dns: {
+        forward: snapshot.forward.get(ip) ?? [],
+        reverse,
+        reverseZone: reverseZone?.name ?? null,
+      },
+    };
   }
 
   async usage(data: IpamData): Promise<IpamUsage> {

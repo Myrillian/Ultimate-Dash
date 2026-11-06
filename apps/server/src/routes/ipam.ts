@@ -6,6 +6,8 @@ import type { IpamScanner } from '../ipam/scanner.js';
 import type { IpamRepository } from '../ipam/repository.js';
 import type { IpamSyncService } from '../ipam/sync.js';
 import type { IpamUsageService } from '../ipam/usage.js';
+import { NotFoundError } from '../db/repository.js';
+import { TechnitiumError } from '../technitium/client.js';
 
 const idParams = z.object({ id: z.coerce.number().int().positive() });
 
@@ -34,6 +36,21 @@ export async function ipamRoutes(
   app.get('/ipam/usage', async (_request, reply) => {
     reply.header('cache-control', 'no-store');
     return usage.usage(repo.all());
+  });
+
+  // Alles zu einer Adresse für das Seitenfenster (Lesen; auch für Nur-lesen-Benutzer).
+  app.get('/ipam/ip/:address', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const { address } = z.object({ address: z.ipv4() }).parse(request.params);
+    try {
+      const detail = await usage.detail(repo.all(), address);
+      if (!detail) throw new NotFoundError('Adresse');
+      return detail;
+    } catch (error) {
+      if (error instanceof TechnitiumError)
+        return reply.code(503).send({ error: error.message, code: error.kind });
+      throw error;
+    }
   });
 
   // Abgleich mit den DHCP-Scopes in Technitium: Netze, die sich übernehmen lassen, und Abweichungen.

@@ -187,6 +187,8 @@ Unter **IPAM** (Umschalter neben DNS und DHCP) verwaltest du deine Netze:
 
 **Typ und Erreichbarkeit:** Jede belegte Adresse zeigt ihren Typ: _Reservierung_ (DHCP-Reservierung), _Lease_ (dynamisch vergebene DHCP-Adresse) oder _Statisch_ (nur im DNS eingetragen, von Hand bestätigt oder per Ping entdeckt). Daneben steht, ob sie auf Ping antwortet (Online, Offline, nicht geprüft). Dieselbe Anzeige gibt es bei den A-Einträgen im DNS.
 
+**Seitenfenster:** Ein Klick auf einen Block im Raster oder auf eine Adresse in der Liste öffnet ein Seitenfenster (auf dem Handy als Vollbild, Link über `?ip=`) mit Überblick, DHCP (Bereich, Reservierung, Lease), DNS (A-Einträge, PTR) und Erreichbarkeit. Es ist für alle Benutzer lesbar; die Bearbeitung folgt in einem nächsten Schritt.
+
 **Ping-Prüfung:** Ultimate Dash pingt alle 30 Minuten (einstellbar von 5 Minuten bis 1 Tag) jede Adresse der Netze, bei denen „Per Ping prüfen“ aktiv ist (Netze bis /22, höchstens 32 Pings gleichzeitig). „Jetzt scannen“ in der Kopfzeile startet einen Durchlauf sofort. Antwortet eine Adresse, die weder in DHCP noch im DNS steht, wird sie als **entdeckt** aufgenommen, in Liste und Raster hervorgehoben und bleibt dort, solange sie antwortet. Admins können sie bestätigen (mit Name, dann gilt sie als bekannt und bleibt auch offline belegt) oder vergessen. Geräte, die Ping blockieren, erscheinen als offline beziehungsweise bleiben unentdeckt. Der Ping kommt vom Server aus, das Netz muss also von dort erreichbar sein (Routing/VLAN, im Docker-Image ist `ping` enthalten).
 
 Ohne Verbindung zu Technitium lassen sich Netze und Bereiche trotzdem pflegen, nur die Belegung fehlt. Änderungen sind Admins vorbehalten und stehen im Änderungsprotokoll.

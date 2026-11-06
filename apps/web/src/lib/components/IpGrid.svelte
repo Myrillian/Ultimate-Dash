@@ -2,8 +2,17 @@
   import ReachDot from './ReachDot.svelte';
   import { categoryColor, cellKindLabel, type Cell, type CellKind } from '$lib/ipam';
 
-  let { cells, label, onpick }: { cells: Cell[]; label: string; onpick?: (cell: Cell) => void } =
-    $props();
+  let {
+    cells,
+    label,
+    onpick,
+    selected = null,
+  }: {
+    cells: Cell[];
+    label: string;
+    onpick?: (cell: Cell) => void;
+    selected?: string | null;
+  } = $props();
 
   let active = $state<number | null>(null);
   const columns = $derived(cells.length > 256 ? 32 : 16);
@@ -97,8 +106,8 @@
       <div
         aria-hidden="true"
         class="grid aspect-square min-w-0 place-items-center rounded-[3px] border border-line text-[10px] leading-none font-bold text-white transition-[outline]"
-        class:outline-2={active === i}
-        class:outline-fg={active === i}
+        class:outline-2={active === i || selected === cell.address}
+        class:outline-fg={active === i || selected === cell.address}
         class:z-10={active === i}
         class:cursor-pointer={!!onpick}
         class:text-fg-muted={cell.kind === 'gateway'}

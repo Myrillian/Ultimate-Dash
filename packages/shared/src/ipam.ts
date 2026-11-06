@@ -218,6 +218,50 @@ export interface IpamUsage {
   networks: Record<number, IpamNetworkUsage>;
 }
 
+/** Alles zu einer einzelnen IP-Adresse: Zuordnung, DHCP, DNS und Erreichbarkeit (für das Seitenfenster). */
+export interface IpamIpDetail {
+  address: string;
+  networkId: number;
+  rangeId: number | null;
+  categoryId: number | null;
+  /** Frei, wenn weder DHCP, DNS noch ein gefundenes Gerät die Adresse belegt. */
+  state: 'free' | 'used';
+  /** Art der Vergabe; bei freien Adressen null. */
+  type: IpamAddressType | null;
+  discovered: boolean;
+  conflict: boolean;
+  alive: boolean | null;
+  lastSeen: string | null;
+  /** ID in der Liste gefundener Geräte (entdeckt oder bestätigt) */
+  hostId: number | null;
+  hostName: string | null;
+  dhcp: {
+    /** Scope, dessen Bereich die Adresse enthält */
+    pool: { scope: string; enabled: boolean; excluded: boolean } | null;
+    reservation: {
+      scope: string;
+      mac: string;
+      hostName: string | null;
+      comment: string | null;
+    } | null;
+    lease: {
+      scope: string;
+      mac: string;
+      hostName: string | null;
+      obtained: string | null;
+      expires: string | null;
+    } | null;
+  };
+  dns: {
+    /** A-Einträge, die auf die Adresse zeigen */
+    forward: { zone: string; domain: string; ttl: number; comment: string | null }[];
+    /** PTR-Eintrag in der Reverse-Zone, falls vorhanden */
+    reverse: { zone: string; domain: string; target: string; ttl: number } | null;
+    /** Reverse-Zone existiert in Technitium (sonst kann kein PTR angelegt werden) */
+    reverseZone: string | null;
+  };
+}
+
 /** Ein DHCP-Scope aus Technitium, zu dem es noch kein Netz gibt. */
 export interface IpamSuggestion {
   scope: string;
