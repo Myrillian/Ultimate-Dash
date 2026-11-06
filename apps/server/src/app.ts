@@ -18,6 +18,9 @@ import { IconCatalogService } from './icons/catalog.js';
 import { apiRoutes } from './routes/api.js';
 import { configRoutes } from './routes/config.js';
 import { iconRoutes } from './routes/icons.js';
+import { IpamRepository } from './ipam/repository.js';
+import { IpamUsageService } from './ipam/usage.js';
+import { ipamRoutes } from './routes/ipam.js';
 import { technitiumRoutes } from './routes/technitium.js';
 import { TechnitiumError } from './technitium/client.js';
 import { DhcpService } from './technitium/dhcp.js';
@@ -104,6 +107,14 @@ export async function buildApp(
   });
   const dhcp = new DhcpService(technitium);
   await app.register(technitiumRoutes, { prefix: '/api', technitium, dhcp, audit });
+  const ipam = new IpamRepository(db, audit);
+  const ipamUsage = new IpamUsageService({
+    scopes: () => dhcp.scopes(),
+    leases: () => dhcp.leases(),
+    zones: () => technitium.zones(),
+    records: (zone) => technitium.records(zone),
+  });
+  await app.register(ipamRoutes, { prefix: '/api', repo: ipam, usage: ipamUsage });
 
   if (config.webRoot && existsSync(config.webRoot)) {
     await app.register(fastifyStatic, {

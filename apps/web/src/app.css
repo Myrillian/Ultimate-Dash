@@ -25,6 +25,15 @@
   --chart-recursive: #6250d6;
   --chart-dropped: #9aa1b2;
   --chart-grid: #e9ebf1;
+  /* Kategorien im IPAM: dieselbe geprüfte Reihenfolge wie die Diagrammfarben */
+  --cat-blue: #2a78d6;
+  --cat-orange: #eb6834;
+  --cat-aqua: #1baf7a;
+  --cat-yellow: #eda100;
+  --cat-magenta: #e87ba4;
+  --cat-green: #008300;
+  --cat-violet: #6250d6;
+  --cat-red: #e34948;
 }
 
 [data-theme='dark'] {
@@ -48,6 +57,14 @@
   --chart-recursive: #9085e9;
   --chart-dropped: #6b7280;
   --chart-grid: #232937;
+  --cat-blue: #3987e5;
+  --cat-orange: #d95926;
+  --cat-aqua: #199e70;
+  --cat-yellow: #c98500;
+  --cat-magenta: #d55181;
+  --cat-green: #008300;
+  --cat-violet: #9085e9;
+  --cat-red: #e66767;
 }
 
 @theme inline {

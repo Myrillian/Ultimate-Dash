@@ -4,6 +4,7 @@
   const links = [
     { href: '/dns', label: 'DNS' },
     { href: '/dhcp', label: 'DHCP' },
+    { href: '/ipam', label: 'IPAM' },
   ];
 </script>
 
