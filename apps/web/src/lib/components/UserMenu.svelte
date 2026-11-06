@@ -4,11 +4,12 @@
   import UiIcon from './UiIcon.svelte';
   import UsersDialog from './UsersDialog.svelte';
   import ImportDialog from './ImportDialog.svelte';
+  import TechnitiumDialog from './TechnitiumDialog.svelte';
+  import { menus } from '$lib/menus.svelte';
 
   let open = $state(false);
   let passwordOpen = $state(false);
   let usersOpen = $state(false);
-  let importOpen = $state(false);
   let root: HTMLDivElement | undefined = $state();
   let trigger: HTMLButtonElement | undefined = $state();
 
@@ -84,6 +85,15 @@
               <UiIcon name="users" size={16} /> Benutzer verwalten
             </button>
           </li>
+          <li>
+            <button
+              type="button"
+              class="menu-item"
+              onclick={() => choose(() => (menus.technitiumOpen = true))}
+            >
+              <UiIcon name="server" size={16} /> Technitium DNS
+            </button>
+          </li>
           <li class="mt-1 border-t border-line pt-1">
             <a href="/api/config/export" download class="menu-item" onclick={() => close()}>
               <UiIcon name="download" size={16} /> Konfiguration exportieren
@@ -93,7 +103,7 @@
             <button
               type="button"
               class="menu-item"
-              onclick={() => choose(() => (importOpen = true))}
+              onclick={() => choose(() => (menus.importOpen = true))}
             >
               <UiIcon name="upload" size={16} /> Konfiguration importieren
             </button>
@@ -112,7 +122,8 @@
 <PasswordDialog open={passwordOpen} onclose={() => (passwordOpen = false)} />
 {#if auth.isAdmin}
   <UsersDialog open={usersOpen} onclose={() => (usersOpen = false)} />
-  <ImportDialog open={importOpen} onclose={() => (importOpen = false)} />
+  <ImportDialog open={menus.importOpen} onclose={() => (menus.importOpen = false)} />
+  <TechnitiumDialog open={menus.technitiumOpen} onclose={() => (menus.technitiumOpen = false)} />
 {/if}
 
 <style>

@@ -1,6 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { loadOidcConfig, type OidcConfig } from './auth/oidc.js';
+import type { TechnitiumConnection } from './technitium/client.js';
+import { connectionFromEnv } from './technitium/service.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
@@ -24,6 +26,11 @@ export interface AppConfig {
   logLevel: string;
   /** null = Anmeldung nur lokal */
   oidc: OidcConfig | null;
+  /**
+   * Feste Technitium-Verbindung aus TECHNITIUM_URL/TECHNITIUM_TOKEN; null = in der Oberfläche
+   * einstellbar. Fehlt das Feld (Tests), werden die Umgebungsvariablen gelesen.
+   */
+  technitium?: TechnitiumConnection | null;
 }
 
 export function loadConfig(): AppConfig {
@@ -40,5 +47,6 @@ export function loadConfig(): AppConfig {
     statusTimeoutMs: intFromEnv('STATUS_TIMEOUT_MS', 5000),
     logLevel: process.env.LOG_LEVEL ?? 'info',
     oidc: loadOidcConfig(),
+    technitium: connectionFromEnv(),
   };
 }

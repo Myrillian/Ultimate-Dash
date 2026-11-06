@@ -15,4 +15,7 @@ services:
       # OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
       # OIDC_BUTTON_LABEL: Mit Authentik anmelden
       # OIDC_ADMIN_GROUPS: homelab-admins
+      # Optional: Technitium fest vorgeben, statt es in der Oberfläche einzurichten
+      # TECHNITIUM_URL: http://10.10.0.53:5380
+      # TECHNITIUM_TOKEN: ${TECHNITIUM_TOKEN}
     restart: unless-stopped

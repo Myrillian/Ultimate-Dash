@@ -4,12 +4,13 @@
   interface Props {
     id: string;
     value: string;
-    autocomplete: 'current-password' | 'new-password';
+    autocomplete: 'current-password' | 'new-password' | 'off';
     error?: string;
     hint?: string;
+    placeholder?: string;
   }
 
-  let { id, value = $bindable(), autocomplete, error, hint }: Props = $props();
+  let { id, value = $bindable(), autocomplete, error, hint, placeholder }: Props = $props();
   let visible = $state(false);
 
   const describedBy = $derived(
@@ -24,6 +25,7 @@
     type={visible ? 'text' : 'password'}
     bind:value
     {autocomplete}
+    {placeholder}
     required
     aria-invalid={!!error}
     aria-describedby={describedBy}

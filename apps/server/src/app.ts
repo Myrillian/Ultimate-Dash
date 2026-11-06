@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { ZodError } from 'zod';
 import type { AppConfig } from './config.js';
 import { openDatabase } from './db/client.js';
+import { createAuditLog } from './db/audit.js';
 import { createRepository, NotFoundError, ValidationError } from './db/repository.js';
 import { EventHub } from './events.js';
 import { registerAuthGuard } from './auth/guard.js';
@@ -17,6 +18,9 @@ import { IconCatalogService } from './icons/catalog.js';
 import { apiRoutes } from './routes/api.js';
 import { configRoutes } from './routes/config.js';
 import { iconRoutes } from './routes/icons.js';
+import { technitiumRoutes } from './routes/technitium.js';
+import { TechnitiumError } from './technitium/client.js';
+import { connectionFromEnv, TechnitiumService } from './technitium/service.js';
 import { StatusMonitor } from './status/monitor.js';
 
 export async function buildApp(
@@ -61,6 +65,10 @@ export async function buildApp(
     }
     if (error instanceof NotFoundError) return reply.code(404).send({ error: error.message });
     if (error instanceof ValidationError) return reply.code(400).send({ error: error.message });
+    if (error instanceof TechnitiumError) {
+      if (error.kind !== 'not-configured') request.log.warn({ err: error }, 'Technitium-Fehler');
+      return reply.code(error.statusCode).send({ error: error.message, code: error.kind });
+    }
     const status = (error as { statusCode?: number }).statusCode;
     if (status && status < 500) return reply.code(status).send({ error: (error as Error).message });
     request.log.error({ err: error }, 'Unerwarteter Fehler');
@@ -87,6 +95,13 @@ export async function buildApp(
     });
   await app.register(iconRoutes, { prefix: '/api', icons });
   await app.register(configRoutes, { prefix: '/api', repo, events });
+  const audit = createAuditLog(db);
+  const technitium = new TechnitiumService({
+    db,
+    audit,
+    envConnection: config.technitium === undefined ? connectionFromEnv() : config.technitium,
+  });
+  await app.register(technitiumRoutes, { prefix: '/api', technitium, audit });
 
   if (config.webRoot && existsSync(config.webRoot)) {
     await app.register(fastifyStatic, {
@@ -126,5 +141,5 @@ export async function buildApp(
     close();
   });
 
-  return { app, repo, authStore, monitor, events };
+  return { app, repo, authStore, monitor, events, technitium, audit };
 }
