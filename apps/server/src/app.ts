@@ -125,6 +125,16 @@ export async function buildApp(
     },
     () => ipamHosts.all(),
   );
+  // Nach jeder Änderung an DHCP oder DNS die zwischengespeicherte Belegung verwerfen,
+  // damit Liste und Seitenfenster sofort den neuen Stand zeigen.
+  app.addHook('onResponse', async (request, reply) => {
+    if (
+      request.method !== 'GET' &&
+      request.url.startsWith('/api/technitium/') &&
+      reply.statusCode < 400
+    )
+      ipamUsage.invalidate();
+  });
   const scanner = new IpamScanner({
     db,
     audit,

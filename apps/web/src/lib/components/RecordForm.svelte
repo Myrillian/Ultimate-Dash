@@ -22,11 +22,13 @@
     zone: string;
     /** null = neuer Eintrag */
     record: DnsRecord | null;
+    /** Vorbelegung beim Anlegen (z. B. aus dem IP-Seitenfenster) */
+    initial?: Partial<RecordDraft> | null;
     onclose: () => void;
     onsubmit: (values: RecordFormValues) => Promise<void>;
   }
 
-  let { open, zone, record, onclose, onsubmit }: Props = $props();
+  let { open, zone, record, initial = null, onclose, onsubmit }: Props = $props();
 
   let draft = $state<RecordDraft>(emptyDraft());
   let errors = $state<Record<string, string>>({});
@@ -50,7 +52,7 @@
           comments: record.comments ?? '',
           disabled: record.disabled,
         }
-      : emptyDraft();
+      : { ...emptyDraft(), ...initial };
   });
 
   async function submit(event: SubmitEvent) {

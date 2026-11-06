@@ -48,22 +48,36 @@ const holdsAddresses = (zone: DnsZone) =>
 export class IpamUsageService {
   private cache: { at: number; snapshot: Snapshot } | null = null;
   private pending: Promise<Snapshot> | null = null;
+  private generation = 0;
 
   constructor(
     private readonly sources: UsageSources,
     private readonly hosts: () => HostRow[] = () => [],
   ) {}
 
+  /** Verwirft den Zwischenspeicher, z. B. nach einer Änderung in Technitium. */
+  invalidate(): void {
+    this.cache = null;
+    this.generation++;
+    this.pending = null;
+  }
+
   private load(): Promise<Snapshot> {
     if (this.cache && Date.now() - this.cache.at < CACHE_MS)
       return Promise.resolve(this.cache.snapshot);
-    this.pending ??= this.fetch()
+    if (this.pending) return this.pending;
+    const generation = this.generation;
+    const request = this.fetch()
       .then((snapshot) => {
-        this.cache = { at: Date.now(), snapshot };
+        // Ein Abruf, der vor einer Änderung begann, darf den Zwischenspeicher nicht mehr füllen.
+        if (generation === this.generation) this.cache = { at: Date.now(), snapshot };
         return snapshot;
       })
-      .finally(() => (this.pending = null));
-    return this.pending;
+      .finally(() => {
+        if (this.pending === request) this.pending = null;
+      });
+    this.pending = request;
+    return request;
   }
 
   private async fetch(): Promise<Snapshot> {
