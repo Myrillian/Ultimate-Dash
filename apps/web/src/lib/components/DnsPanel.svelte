@@ -199,6 +199,7 @@
       </h2>
       {#if summary}
         <a href="/dns" class="text-xs text-accent hover:underline">Zonen und Records ›</a>
+        <a href="/dhcp" class="text-xs text-accent hover:underline">DHCP ›</a>
       {/if}
 
       <div

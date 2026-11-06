@@ -16,6 +16,13 @@ import type {
   ServiceInput,
   ServiceStatus,
   AuditEntry,
+  DhcpLease,
+  DhcpLeaseAction,
+  DhcpReservationDelete,
+  DhcpReservationInput,
+  DhcpReservationUpdate,
+  DhcpScope,
+  DhcpScopeState,
   DnsRecordCreate,
   DnsRecordDelete,
   DnsRecordList,
@@ -116,5 +123,17 @@ export const api = {
   updateDnsRecord: (input: DnsRecordUpdate) => request<void>('PUT', '/technitium/records', input),
   deleteDnsRecord: (input: DnsRecordDelete) =>
     request<void>('POST', '/technitium/records/delete', input),
+  dhcpScopes: () => request<DhcpScope[]>('GET', '/technitium/dhcp/scopes'),
+  dhcpLeases: () => request<DhcpLease[]>('GET', '/technitium/dhcp/leases'),
+  setDhcpScope: (input: DhcpScopeState) =>
+    request<void>('POST', '/technitium/dhcp/scopes/state', input),
+  addDhcpReservation: (input: DhcpReservationInput) =>
+    request<void>('POST', '/technitium/dhcp/reservations', input),
+  updateDhcpReservation: (input: DhcpReservationUpdate) =>
+    request<void>('PUT', '/technitium/dhcp/reservations', input),
+  deleteDhcpReservation: (input: DhcpReservationDelete) =>
+    request<void>('POST', '/technitium/dhcp/reservations/delete', input),
+  dhcpLeaseAction: (input: DhcpLeaseAction) =>
+    request<void>('POST', '/technitium/dhcp/leases/action', input),
   audit: () => request<AuditEntry[]>('GET', '/audit'),
 };

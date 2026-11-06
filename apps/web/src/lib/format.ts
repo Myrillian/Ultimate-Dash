@@ -41,3 +41,16 @@ export function formatRemaining(ms: number): string {
   }
   return `${minutes}:${String(seconds).padStart(2, '0')} Min.`;
 }
+
+/** 2160 → „1 Tag 12 Std.“, 90 → „1 Std. 30 Min.“ */
+export function formatDuration(totalMinutes: number): string {
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  const parts = [
+    days ? `${days} ${days === 1 ? 'Tag' : 'Tage'}` : '',
+    hours ? `${hours} Std.` : '',
+    minutes ? `${minutes} Min.` : '',
+  ].filter(Boolean);
+  return parts.join(' ') || '0 Min.';
+}

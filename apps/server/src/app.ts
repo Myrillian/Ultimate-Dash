@@ -20,6 +20,7 @@ import { configRoutes } from './routes/config.js';
 import { iconRoutes } from './routes/icons.js';
 import { technitiumRoutes } from './routes/technitium.js';
 import { TechnitiumError } from './technitium/client.js';
+import { DhcpService } from './technitium/dhcp.js';
 import { connectionFromEnv, TechnitiumService } from './technitium/service.js';
 import { StatusMonitor } from './status/monitor.js';
 
@@ -101,7 +102,8 @@ export async function buildApp(
     audit,
     envConnection: config.technitium === undefined ? connectionFromEnv() : config.technitium,
   });
-  await app.register(technitiumRoutes, { prefix: '/api', technitium, audit });
+  const dhcp = new DhcpService(technitium);
+  await app.register(technitiumRoutes, { prefix: '/api', technitium, dhcp, audit });
 
   if (config.webRoot && existsSync(config.webRoot)) {
     await app.register(fastifyStatic, {

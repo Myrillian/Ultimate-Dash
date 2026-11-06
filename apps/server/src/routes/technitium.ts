@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { dnsName } from '@ultimate-dash/shared';
 import { blockingAction, statsRange } from '@ultimate-dash/shared';
 import type { AuditLog } from '../db/audit.js';
+import type { DhcpService } from '../technitium/dhcp.js';
 import type { TechnitiumService } from '../technitium/service.js';
 
 const summaryQuery = z.object({ range: statsRange.default('day') });
@@ -15,7 +16,11 @@ function requireAdmin(request: FastifyRequest, reply: FastifyReply): boolean {
 
 export async function technitiumRoutes(
   app: FastifyInstance,
-  { technitium, audit }: { technitium: TechnitiumService; audit: AuditLog },
+  {
+    technitium,
+    dhcp,
+    audit,
+  }: { technitium: TechnitiumService; dhcp: DhcpService; audit: AuditLog },
 ) {
   app.get('/technitium/settings', async (request, reply) => {
     if (!requireAdmin(request, reply)) return reply;
@@ -69,6 +74,41 @@ export async function technitiumRoutes(
   // Löschen per POST, weil nicht jeder Proxy einen Body bei DELETE durchreicht.
   app.post('/technitium/records/delete', async (request, reply) => {
     await technitium.deleteRecord(request.body as never, request.user!);
+    return reply.code(204).send();
+  });
+
+  app.get('/technitium/dhcp/scopes', async (_request, reply) => {
+    reply.header('cache-control', 'no-store');
+    return dhcp.scopes();
+  });
+
+  app.get('/technitium/dhcp/leases', async (_request, reply) => {
+    reply.header('cache-control', 'no-store');
+    return dhcp.leases();
+  });
+
+  app.post('/technitium/dhcp/scopes/state', async (request, reply) => {
+    await dhcp.setScopeEnabled(request.body as never, request.user!);
+    return reply.code(204).send();
+  });
+
+  app.post('/technitium/dhcp/reservations', async (request, reply) => {
+    await dhcp.addReservation(request.body as never, request.user!);
+    return reply.code(204).send();
+  });
+
+  app.put('/technitium/dhcp/reservations', async (request, reply) => {
+    await dhcp.updateReservation(request.body as never, request.user!);
+    return reply.code(204).send();
+  });
+
+  app.post('/technitium/dhcp/reservations/delete', async (request, reply) => {
+    await dhcp.deleteReservation(request.body as never, request.user!);
+    return reply.code(204).send();
+  });
+
+  app.post('/technitium/dhcp/leases/action', async (request, reply) => {
+    await dhcp.leaseAction(request.body as never, request.user!);
     return reply.code(204).send();
   });
 

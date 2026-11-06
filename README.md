@@ -160,4 +160,14 @@ Das Token bleibt auf dem Server (in der SQLite-Datei) und wird nie an den Browse
 
 Über „Zonen und Records ›“ im DNS-Bereich (oder `/dns`) lassen sich alle Zonen und ihre Einträge ansehen, durchsuchen und nach Typ filtern. Namen erscheinen relativ zur Zone (`nas` statt `nas.home.lan`, `@` für die Zone selbst). Admins können Einträge der Typen A, AAAA, CNAME, PTR, MX, TXT, NS und SRV anlegen, ändern (auch umbenennen, TTL, Kommentar, deaktivieren) und löschen. Andere Typen werden nur angezeigt. Bei A und AAAA lässt sich der passende PTR-Eintrag gleich mit anlegen; fehlt die Reverse-Zone, erstellt Technitium sie dabei. Interne Zonen von Technitium sind schreibgeschützt. Das API-Token braucht dafür die Zonen-Rechte _View_ und _Modify_ beziehungsweise _Delete_. Jede Änderung steht im Änderungsprotokoll.
 
+### DHCP
+
+Unter `/dhcp` (Link „DHCP ›“ im DNS-Bereich) zeigt Ultimate Dash alle Scopes mit Bereich, Gateway, Domain, Leasedauer, Ausnahmen und Belegung (dynamische Leases im Verhältnis zu den verteilbaren Adressen), dazu alle Leases und Reservierungen mit Suche und Scope-Filter. Admins können:
+
+- Scopes aktivieren und deaktivieren
+- dynamische Leases in Reservierungen umwandeln, Reservierungen wieder aufheben und Leases freigeben oder löschen
+- Reservierungen anlegen, ändern und löschen (MAC, IP, Hostname, Kommentar)
+
+Technitium kennt kein „Reservierung ändern“. Ultimate Dash entfernt dafür die alte und legt die neue an. Schlägt das Anlegen fehl (zum Beispiel, weil die IP schon vergeben ist), wird die alte Reservierung wiederhergestellt. Scopes selbst lassen sich hier noch nicht anlegen oder bearbeiten, das geht weiter in Technitium. Das API-Token braucht die Rechte _DhcpServer: View_, _Modify_ und _Delete_. Alle Änderungen stehen im Änderungsprotokoll.
+
 Zum Ausprobieren ohne echten Server gibt es eine Simulation: `pnpm --filter @ultimate-dash/server fake:technitium` startet sie auf Port 5380 mit dem Token `dev-token`.

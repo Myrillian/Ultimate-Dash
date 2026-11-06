@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatCount, formatPercent, formatRemaining, formatTick, niceTicks } from './format';
+import {
+  formatCount,
+  formatDuration,
+  formatPercent,
+  formatRemaining,
+  formatTick,
+  niceTicks,
+} from './format';
 
 describe('Zahlenformate', () => {
   it('formatiert Zähler deutsch und große Werte kompakt', () => {
@@ -26,5 +33,12 @@ describe('Zahlenformate', () => {
   it('zeigt Restzeit als Minuten oder Stunden', () => {
     expect(formatRemaining(65_000)).toBe('1:05 Min.');
     expect(formatRemaining(3_900_000)).toBe('1:05 Std.');
+  });
+
+  it('formatiert Dauern', () => {
+    expect(formatDuration(2160)).toBe('1 Tag 12 Std.');
+    expect(formatDuration(90)).toBe('1 Std. 30 Min.');
+    expect(formatDuration(2880)).toBe('2 Tage');
+    expect(formatDuration(0)).toBe('0 Min.');
   });
 });

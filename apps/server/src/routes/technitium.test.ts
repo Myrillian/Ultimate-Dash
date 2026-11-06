@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import type {
   AuditEntry,
+  DhcpLease,
+  DhcpScope,
   DnsRecordList,
   DnsSummary,
   DnsZone,
@@ -325,5 +327,204 @@ describe('DNS-Records', () => {
     expect((await call('POST', '/api/technitium/records/delete', body, viewer)).statusCode).toBe(
       403,
     );
+  });
+});
+
+describe('DHCP', () => {
+  const scopes = async () => (await call('GET', '/api/technitium/dhcp/scopes')).json<DhcpScope[]>();
+  const leases = async () => (await call('GET', '/api/technitium/dhcp/leases')).json<DhcpLease[]>();
+  const reservation = {
+    scope: 'LAN',
+    hardwareAddress: 'aa:bb:cc:00:00:09',
+    ipAddress: '10.10.10.30',
+    hostName: 'drucker',
+    comments: 'Flur',
+  };
+
+  it('liest Scopes mit Details und Leases', async () => {
+    await connect();
+    const list = await scopes();
+    expect(list.map((s) => [s.name, s.enabled])).toEqual([
+      ['IoT', false],
+      ['LAN', true],
+    ]);
+    const lan = list.find((s) => s.name === 'LAN')!;
+    expect(lan).toMatchObject({
+      startingAddress: '10.10.10.1',
+      routerAddress: '10.10.10.1',
+      leaseMinutes: 1440 + 720,
+      dnsServers: ['10.10.10.2'],
+      exclusions: [{ startingAddress: '10.10.10.1', endingAddress: '10.10.10.99' }],
+    });
+    expect(lan.reservations).toEqual([
+      {
+        hardwareAddress: 'AA-BB-CC-00-00-01',
+        address: '10.10.10.20',
+        hostName: 'nas',
+        comments: 'Synology',
+      },
+    ]);
+    const all = await leases();
+    expect(all).toHaveLength(3);
+    expect(all.find((l) => l.address === '10.10.10.102')).toMatchObject({
+      type: 'Dynamic',
+      hostName: null,
+      expires: '11/07/2026 20:00:00',
+    });
+  });
+
+  it('schaltet einen Scope ein und aus', async () => {
+    await connect();
+    expect(
+      (await call('POST', '/api/technitium/dhcp/scopes/state', { scope: 'IoT', enabled: true }))
+        .statusCode,
+    ).toBe(204);
+    expect((await scopes()).find((s) => s.name === 'IoT')!.enabled).toBe(true);
+    const missing = await call('POST', '/api/technitium/dhcp/scopes/state', {
+      scope: 'Nix',
+      enabled: true,
+    });
+    expect(missing.statusCode).toBe(502);
+  });
+
+  it('legt Reservierungen an und normalisiert die MAC', async () => {
+    await connect();
+    expect((await call('POST', '/api/technitium/dhcp/reservations', reservation)).statusCode).toBe(
+      204,
+    );
+    const lan = (await scopes()).find((s) => s.name === 'LAN')!;
+    expect(lan.reservations.find((r) => r.address === '10.10.10.30')).toEqual({
+      hardwareAddress: 'AA-BB-CC-00-00-09',
+      address: '10.10.10.30',
+      hostName: 'drucker',
+      comments: 'Flur',
+    });
+
+    const duplicate = await call('POST', '/api/technitium/dhcp/reservations', {
+      ...reservation,
+      ipAddress: '10.10.10.31',
+    });
+    expect(duplicate.statusCode).toBe(502);
+    expect(duplicate.json().error).toMatch(/already exists/);
+
+    const invalid = await call('POST', '/api/technitium/dhcp/reservations', {
+      ...reservation,
+      hardwareAddress: 'xyz',
+      ipAddress: '10.10.10',
+    });
+    expect(invalid.statusCode).toBe(400);
+    expect(
+      invalid
+        .json()
+        .issues.map((i: { path: string[] }) => i.path[0])
+        .sort(),
+    ).toEqual(['hardwareAddress', 'ipAddress']);
+  });
+
+  it('ändert eine Reservierung und stellt sie bei einem Fehler wieder her', async () => {
+    await connect();
+    const update = (body: object) => call('PUT', '/api/technitium/dhcp/reservations', body);
+    const ok = await update({
+      scope: 'LAN',
+      currentHardwareAddress: 'AA-BB-CC-00-00-01',
+      hardwareAddress: 'AA-BB-CC-00-00-01',
+      ipAddress: '10.10.10.21',
+      hostName: 'nas',
+      comments: 'Neu',
+    });
+    expect(ok.statusCode).toBe(204);
+    let lan = (await scopes()).find((s) => s.name === 'LAN')!;
+    expect(lan.reservations).toEqual([
+      {
+        hardwareAddress: 'AA-BB-CC-00-00-01',
+        address: '10.10.10.21',
+        hostName: 'nas',
+        comments: 'Neu',
+      },
+    ]);
+
+    // Zweite Reservierung anlegen und dann auf die IP der ersten ändern: Technitium lehnt ab.
+    await call('POST', '/api/technitium/dhcp/reservations', reservation);
+    const clash = await update({
+      ...reservation,
+      currentHardwareAddress: reservation.hardwareAddress,
+      ipAddress: '10.10.10.21',
+    });
+    expect(clash.statusCode).toBe(502);
+    lan = (await scopes()).find((s) => s.name === 'LAN')!;
+    expect(lan.reservations.find((r) => r.hardwareAddress === 'AA-BB-CC-00-00-09')).toMatchObject({
+      address: '10.10.10.30',
+      hostName: 'drucker',
+      comments: 'Flur',
+    });
+    expect(lan.reservations).toHaveLength(2);
+
+    const gone = await update({ ...reservation, currentHardwareAddress: 'AA-BB-CC-99-99-99' });
+    expect(gone.statusCode).toBe(502);
+    expect(gone.json().error).toMatch(/existiert nicht mehr/);
+  });
+
+  it('wandelt Leases um, gibt sie frei und löscht Reservierungen', async () => {
+    await connect();
+    const action = (hardwareAddress: string, name: string) =>
+      call('POST', '/api/technitium/dhcp/leases/action', {
+        scope: 'LAN',
+        hardwareAddress,
+        action: name,
+      });
+    expect((await action('AA-BB-CC-00-00-02', 'reserve')).statusCode).toBe(204);
+    expect((await leases()).find((l) => l.hardwareAddress === 'AA-BB-CC-00-00-02')!.type).toBe(
+      'Reserved',
+    );
+    expect((await scopes()).find((s) => s.name === 'LAN')!.reservations).toHaveLength(2);
+
+    expect((await action('AA-BB-CC-00-00-02', 'unreserve')).statusCode).toBe(204);
+    expect((await action('AA-BB-CC-00-00-03', 'remove')).statusCode).toBe(204);
+    expect((await leases()).map((l) => l.hardwareAddress)).not.toContain('AA-BB-CC-00-00-03');
+
+    const del = await call('POST', '/api/technitium/dhcp/reservations/delete', {
+      scope: 'LAN',
+      hardwareAddress: 'aa-bb-cc-00-00-01',
+    });
+    expect(del.statusCode).toBe(204);
+    expect((await scopes()).find((s) => s.name === 'LAN')!.reservations).toHaveLength(0);
+
+    const log = (await call('GET', '/api/audit')).json<AuditEntry[]>();
+    expect(log.slice(0, 4).map((e) => [e.action, e.target])).toEqual([
+      ['technitium.dhcp.reservation.delete', 'AA-BB-CC-00-00-01'],
+      ['technitium.dhcp.lease.remove', 'AA-BB-CC-00-00-03'],
+      ['technitium.dhcp.lease.unreserve', 'AA-BB-CC-00-00-02'],
+      ['technitium.dhcp.lease.reserve', 'AA-BB-CC-00-00-02'],
+    ]);
+  });
+
+  it('lässt Nur-lesen-Benutzer ansehen, aber nicht ändern', async () => {
+    await connect();
+    await call('POST', '/api/users', { username: 'gast', password: 'noch-ein-langes-pw' });
+    const login = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { username: 'gast', password: 'noch-ein-langes-pw' },
+    });
+    const viewer = String(login.headers['set-cookie']).split(';')[0]!;
+    expect((await call('GET', '/api/technitium/dhcp/scopes', undefined, viewer)).statusCode).toBe(
+      200,
+    );
+    expect((await call('GET', '/api/technitium/dhcp/leases', undefined, viewer)).statusCode).toBe(
+      200,
+    );
+    expect(
+      (await call('POST', '/api/technitium/dhcp/reservations', reservation, viewer)).statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await call(
+          'POST',
+          '/api/technitium/dhcp/scopes/state',
+          { scope: 'LAN', enabled: false },
+          viewer,
+        )
+      ).statusCode,
+    ).toBe(403);
   });
 });
