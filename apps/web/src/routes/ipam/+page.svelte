@@ -23,6 +23,7 @@
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import IpGrid from '$lib/components/IpGrid.svelte';
   import IpPanel from '$lib/components/IpPanel.svelte';
+  import IpWizard from '$lib/components/IpWizard.svelte';
   import NetworkForm from '$lib/components/NetworkForm.svelte';
   import HostDialog from '$lib/components/HostDialog.svelte';
   import ReachDot from '$lib/components/ReachDot.svelte';
@@ -67,6 +68,12 @@
   // Adresse im Seitenfenster; steht in der URL (?ip=), damit Links und Zurück-Taste funktionieren.
   const panelAddress = $derived(page.url.searchParams.get('ip'));
   let panelVersion = $state(0);
+  let wizard = $state<{ open: boolean; address: string }>({ open: false, address: '' });
+  /** Erste freie Adresse des Netzes als Vorschlag, notfalls eine aus dem DHCP-Pool. */
+  const suggestedAddress = () =>
+    (cells.find((c) => c.kind === 'free') ?? cells.find((c) => c.kind === 'pool'))?.address ?? '';
+  const openWizard = (address?: string) =>
+    (wizard = { open: true, address: address ?? suggestedAddress() });
   function openPanel(address: string | null) {
     const url = new URL(page.url);
     if (address) url.searchParams.set('ip', address);
@@ -319,7 +326,12 @@
   </div>
 {/snippet}
 
-<div class="mx-auto flex min-h-dvh max-w-[1600px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10">
+<div
+  class="mx-auto flex min-h-dvh max-w-[1600px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10 {panelAddress &&
+  network
+    ? 'sm:pr-[27rem] lg:pr-[27rem]'
+    : ''}"
+>
   <header class="flex flex-wrap items-center gap-3">
     <a href="/" class="icon-btn" aria-label="Zurück zum Dashboard"><UiIcon name="back" /></a>
     <h1 class="flex items-center gap-2 text-xl font-semibold tracking-tight">
@@ -328,6 +340,11 @@
     <TechNav />
     <div class="ml-auto flex items-center gap-1">
       {#if auth.isAdmin}
+        {#if network}
+          <button type="button" class="btn btn-primary" onclick={() => openWizard()}>
+            <UiIcon name="plus" size={16} /> Neue IP
+          </button>
+        {/if}
         <button type="button" class="btn" disabled={scan?.running} onclick={runScan}>
           <UiIcon name="refresh" size={16} class={scan?.running ? 'animate-spin' : ''} />
           {scan?.running ? 'Scannt …' : 'Jetzt scannen'}
@@ -822,6 +839,22 @@
     version={panelVersion}
     onclose={() => openPanel(null)}
     onchanged={() => load()}
+    onnew={(address) => openWizard(address)}
+  />
+{/if}
+
+{#if network}
+  <IpWizard
+    open={wizard.open}
+    {network}
+    address={wizard.address}
+    onclose={() => (wizard.open = false)}
+    ondone={async (address) => {
+      wizard.open = false;
+      await load();
+      panelVersion++;
+      openPanel(address);
+    }}
   />
 {/if}
 

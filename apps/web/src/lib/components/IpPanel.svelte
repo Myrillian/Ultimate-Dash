@@ -28,8 +28,10 @@
     onclose: () => void;
     /** Nach einer Änderung in Technitium oder im IPAM: Seite soll neu laden. */
     onchanged?: () => void;
+    /** Assistent „Neue IP“ für diese (freie) Adresse öffnen. */
+    onnew?: (address: string) => void;
   }
-  let { address, network, categories, version = 0, onclose, onchanged }: Props = $props();
+  let { address, network, categories, version = 0, onclose, onchanged, onnew }: Props = $props();
 
   let detail = $state<IpamIpDetail | null>(null);
   let error = $state<string | null>(null);
@@ -389,8 +391,19 @@
         </dl>
         {#if detail.state === 'free' && !isGateway}
           <p class="text-fg-muted">
-            Diese Adresse ist weder im DHCP noch im DNS eingetragen und es kam keine Ping-Antwort.
+            {detail.dhcp.pool && !detail.dhcp.pool.excluded
+              ? 'Frei, wird dynamisch vergeben (DHCP-Pool).'
+              : 'Diese Adresse ist weder im DHCP noch im DNS eingetragen und es kam keine Ping-Antwort.'}
           </p>
+          {#if auth.isAdmin}
+            <div>
+              <button
+                type="button"
+                class="btn btn-primary px-2.5 py-1 text-xs"
+                onclick={() => onnew?.(address)}>Neue IP anlegen …</button
+              >
+            </div>
+          {/if}
         {/if}
         {#if detail.conflict}
           <p class="rounded-xl border border-down/40 p-2.5 text-down">
