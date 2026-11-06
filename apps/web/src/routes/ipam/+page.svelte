@@ -7,6 +7,7 @@
     IpamNetwork,
     IpamNetworkUsage,
     IpamRange,
+    IpamSync,
     IpamUsage,
   } from '@ultimate-dash/shared';
   import { ipv4RangeSize, ipv4ToInt, parseCidr } from '@ultimate-dash/shared';
@@ -20,6 +21,7 @@
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import IpGrid from '$lib/components/IpGrid.svelte';
   import NetworkForm from '$lib/components/NetworkForm.svelte';
+  import SyncPanel from '$lib/components/SyncPanel.svelte';
   import RangeForm from '$lib/components/RangeForm.svelte';
   import TechNav from '$lib/components/TechNav.svelte';
   import UiIcon from '$lib/components/UiIcon.svelte';
@@ -27,6 +29,7 @@
 
   let data = $state<IpamData>({ networks: [], categories: [], ranges: [] });
   let usage = $state<IpamUsage>({ available: true, reason: null, networks: {} });
+  let sync = $state<IpamSync>({ available: false, reason: null, suggestions: [], drift: [] });
   let loaded = $state(false);
   let error = $state<string | null>(null);
   let refreshing = $state(false);
@@ -82,6 +85,10 @@
     refreshing = !initial;
     try {
       [data, usage] = await Promise.all([api.ipam(), api.ipamUsage()]);
+      // Der Abgleich ist nur für Admins sichtbar und darf die Seite nicht blockieren.
+      sync = auth.isAdmin
+        ? await api.ipamSync().catch(() => sync)
+        : { available: false, reason: null, suggestions: [], drift: [] };
       error = null;
     } catch (e) {
       error = e instanceof Error ? e.message : 'IPAM-Daten konnten nicht geladen werden';
@@ -94,6 +101,29 @@
 
   const open = (id: number | null) =>
     void goto(id ? `/ipam?net=${id}` : '/ipam', { keepFocus: true });
+
+  async function importScopes(scopes: string[], withPoolRange: boolean) {
+    try {
+      const created = await api.importIpam({ scopes, withPoolRange });
+      toasts.show(created.length === 1 ? 'Netz übernommen' : `${created.length} Netze übernommen`);
+    } catch (e) {
+      toasts.show(e instanceof Error ? e.message : 'Übernehmen fehlgeschlagen', 'error');
+    }
+    await load();
+  }
+
+  const drift = $derived(sync.drift.filter((d) => d.networkId === network?.id));
+
+  async function adoptGateway(gateway: string) {
+    if (!network) return;
+    try {
+      await api.updateIpamNetwork(network.id, { ...network, gateway });
+      toasts.show('Gateway übernommen');
+    } catch (e) {
+      toasts.show(e instanceof Error ? e.message : 'Übernehmen fehlgeschlagen', 'error');
+    }
+    await load();
+  }
 
   async function saveNetwork(values: Parameters<typeof api.createIpamNetwork>[0]) {
     const existing = networkForm.existing;
@@ -276,7 +306,11 @@
         {/if}
       </div>
 
-      {#if data.networks.length === 0}
+      {#if auth.isAdmin && sync.suggestions.length > 0}
+        <SyncPanel suggestions={sync.suggestions} onimport={importScopes} />
+      {/if}
+
+      {#if data.networks.length === 0 && sync.suggestions.length === 0}
         <div class="mx-auto max-w-md rounded-2xl border border-dashed border-line p-6 text-center">
           <p class="font-medium">Noch keine Netze.</p>
           <p class="mt-1 text-sm text-fg-muted">
@@ -372,6 +406,23 @@
           </div>
         {/if}
       </div>
+
+      {#each drift as d (d.field)}
+        <p
+          class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-muted px-3 py-2 text-sm"
+          role="status"
+        >
+          <span>
+            In Technitium (Scope {d.scope}) ist <span class="font-mono">{d.remote}</span> als
+            Gateway eingetragen, hier {d.local ? '' : 'steht keins'}{#if d.local}<span
+                class="font-mono">{d.local}</span
+              >{/if}.
+          </span>
+          <button type="button" class="btn ml-auto" onclick={() => adoptGateway(d.remote)}>
+            Übernehmen
+          </button>
+        </p>
+      {/each}
 
       <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         <section

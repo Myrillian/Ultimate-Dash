@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fileURLToPath } from 'node:url';
-import type { IpamCategory, IpamData, IpamNetwork, IpamUsage } from '@ultimate-dash/shared';
+import type {
+  IpamCategory,
+  IpamData,
+  IpamNetwork,
+  IpamSync,
+  IpamUsage,
+} from '@ultimate-dash/shared';
 import { buildApp } from '../app.js';
 import type { AppConfig } from '../config.js';
 import { startFakeTechnitium, type FakeTechnitium } from '../technitium/fake-server.js';
@@ -201,5 +207,88 @@ describe('IPAM-Belegung', () => {
     const u = usage.networks[network.id]!;
     expect(u.addresses.find((a) => a.address === '10.10.10.101')!.conflict).toBe(true);
     expect(u.conflicts).toBe(1);
+  });
+});
+
+describe('IPAM-Abgleich mit Technitium', () => {
+  const connect = () =>
+    call('PUT', '/api/technitium/settings', { url: fake.url, token: fake.token });
+
+  it('meldet ohne Technitium „nicht verfügbar“', async () => {
+    const sync = (await call('GET', '/api/ipam/sync')).json<IpamSync>();
+    expect(sync.available).toBe(false);
+  });
+
+  it('schlägt Netze aus DHCP-Scopes vor', async () => {
+    await connect();
+    const sync = (await call('GET', '/api/ipam/sync')).json<IpamSync>();
+    expect(sync.suggestions.map((s) => [s.scope, s.cidr, s.gateway])).toEqual([
+      ['IoT', '10.10.20.0/24', '10.10.20.1'],
+      ['LAN', '10.10.10.0/24', '10.10.10.1'],
+    ]);
+    const lan = sync.suggestions.find((s) => s.scope === 'LAN')!;
+    // Ausschluss .1 bis .99 fällt weg, übrig bleibt .100 bis .254
+    expect(lan.pools).toEqual([{ start: '10.10.10.100', end: '10.10.10.254' }]);
+  });
+
+  it('übernimmt Scopes als Netze mit DHCP-Kategorie und Bereich', async () => {
+    await connect();
+    const res = await call('POST', '/api/ipam/import', { scopes: ['LAN'] });
+    expect(res.statusCode).toBe(201);
+    const data = (await call('GET', '/api/ipam')).json<IpamData>();
+    expect(data.networks).toMatchObject([
+      { name: 'LAN', cidr: '10.10.10.0/24', gateway: '10.10.10.1' },
+    ]);
+    expect(data.categories.map((c) => c.name)).toEqual(['DHCP']);
+    expect(data.ranges).toMatchObject([
+      { startAddress: '10.10.10.100', endAddress: '10.10.10.254' },
+    ]);
+    // Danach ist LAN keine Empfehlung mehr; die Belegung nutzt den neuen Bereich
+    const sync = (await call('GET', '/api/ipam/sync')).json<IpamSync>();
+    expect(sync.suggestions.map((s) => s.scope)).toEqual(['IoT']);
+    expect(sync.drift).toEqual([]);
+    const audit = (await call('GET', '/api/audit')).json<{ action: string }[]>();
+    expect(audit.map((a) => a.action)).toContain('ipam.import');
+  });
+
+  it('ohne Pool-Bereich legt nur das Netz an', async () => {
+    await connect();
+    await call('POST', '/api/ipam/import', { scopes: ['IoT'], withPoolRange: false });
+    const data = (await call('GET', '/api/ipam')).json<IpamData>();
+    expect(data.networks).toHaveLength(1);
+    expect(data.categories).toHaveLength(0);
+    expect(data.ranges).toHaveLength(0);
+  });
+
+  it('lehnt unbekannte oder sich überschneidende Scopes ab', async () => {
+    await connect();
+    expect((await call('POST', '/api/ipam/import', { scopes: ['Gibt-es-nicht'] })).statusCode).toBe(
+      400,
+    );
+    await call('POST', '/api/ipam/networks', { name: 'Gross', cidr: '10.10.0.0/16' });
+    const clash = await call('POST', '/api/ipam/import', { scopes: ['LAN'] });
+    expect(clash.statusCode).toBe(400);
+    expect(clash.json().error).toContain('Gross');
+    expect((await call('POST', '/api/ipam/import', { scopes: [] })).statusCode).toBe(400);
+  });
+
+  it('zeigt abweichendes Gateway als Abweichung', async () => {
+    await connect();
+    await call('POST', '/api/ipam/networks', {
+      name: 'LAN',
+      cidr: '10.10.10.0/24',
+      gateway: '10.10.10.254',
+    });
+    const sync = (await call('GET', '/api/ipam/sync')).json<IpamSync>();
+    expect(sync.drift).toEqual([
+      {
+        networkId: expect.any(Number),
+        networkName: 'LAN',
+        scope: 'LAN',
+        field: 'gateway',
+        local: '10.10.10.254',
+        remote: '10.10.10.1',
+      },
+    ]);
   });
 });

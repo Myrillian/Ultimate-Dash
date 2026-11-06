@@ -1,13 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { IpamRepository } from '../ipam/repository.js';
+import type { IpamSyncService } from '../ipam/sync.js';
 import type { IpamUsageService } from '../ipam/usage.js';
 
 const idParams = z.object({ id: z.coerce.number().int().positive() });
 
 export async function ipamRoutes(
   app: FastifyInstance,
-  { repo, usage }: { repo: IpamRepository; usage: IpamUsageService },
+  { repo, usage, sync }: { repo: IpamRepository; usage: IpamUsageService; sync: IpamSyncService },
 ) {
   app.get('/ipam', async (_request, reply) => {
     reply.header('cache-control', 'no-store');
@@ -19,6 +20,16 @@ export async function ipamRoutes(
     reply.header('cache-control', 'no-store');
     return usage.usage(repo.all());
   });
+
+  // Abgleich mit den DHCP-Scopes in Technitium: Netze, die sich übernehmen lassen, und Abweichungen.
+  app.get('/ipam/sync', async (_request, reply) => {
+    reply.header('cache-control', 'no-store');
+    return sync.compare();
+  });
+
+  app.post('/ipam/import', async (request, reply) =>
+    reply.code(201).send(await sync.import(request.body as never, request.user!)),
+  );
 
   app.post('/ipam/networks', async (request, reply) =>
     reply.code(201).send(repo.createNetwork(request.body as never, request.user!)),

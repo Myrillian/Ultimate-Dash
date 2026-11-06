@@ -4,7 +4,9 @@ import type {
   IpamData,
   IpamNetwork,
   IpamNetworkInput,
+  IpamImportInput,
   IpamRange,
+  IpamSync,
   IpamRangeInput,
   IpamUsage,
   AuthStatus,
@@ -147,6 +149,8 @@ export const api = {
 
   ipam: () => request<IpamData>('GET', '/ipam'),
   ipamUsage: () => request<IpamUsage>('GET', '/ipam/usage'),
+  ipamSync: () => request<IpamSync>('GET', '/ipam/sync'),
+  importIpam: (input: IpamImportInput) => request<IpamNetwork[]>('POST', '/ipam/import', input),
   createIpamNetwork: (input: IpamNetworkInput) =>
     request<IpamNetwork>('POST', '/ipam/networks', input),
   updateIpamNetwork: (id: number, input: IpamNetworkInput) =>

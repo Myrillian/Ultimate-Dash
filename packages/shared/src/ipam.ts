@@ -194,3 +194,39 @@ export interface IpamUsage {
   reason: string | null;
   networks: Record<number, IpamNetworkUsage>;
 }
+
+/** Ein DHCP-Scope aus Technitium, zu dem es noch kein Netz gibt. */
+export interface IpamSuggestion {
+  scope: string;
+  cidr: string;
+  gateway: string | null;
+  domain: string | null;
+  /** Verteilbare Adressen (Scope-Bereich ohne Ausschlüsse), begrenzt auf die Hostadressen des Netzes */
+  pools: { start: string; end: string }[];
+  /** Name eines bestehenden Netzes, das sich mit dem Scope überschneidet; dann ist kein Import möglich */
+  overlaps: string | null;
+}
+
+/** Ein Netz weicht von dem Scope in Technitium ab, der dasselbe Netz bedient. */
+export interface IpamDrift {
+  networkId: number;
+  networkName: string;
+  scope: string;
+  field: 'gateway';
+  local: string | null;
+  remote: string;
+}
+
+export interface IpamSync {
+  available: boolean;
+  reason: string | null;
+  suggestions: IpamSuggestion[];
+  drift: IpamDrift[];
+}
+
+export const ipamImportInput = z.object({
+  scopes: z.array(z.string().trim().min(1)).min(1, 'Wähle mindestens einen Scope'),
+  /** Die verteilbaren Adressen als Bereich der Kategorie „DHCP“ anlegen */
+  withPoolRange: z.boolean().default(true),
+});
+export type IpamImportInput = z.input<typeof ipamImportInput>;
