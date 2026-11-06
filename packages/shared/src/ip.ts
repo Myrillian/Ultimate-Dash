@@ -91,3 +91,18 @@ export function ipv4Segments(
   if (cursor <= e) result.push({ start: intToIpv4(cursor), end: intToIpv4(e) });
   return result;
 }
+
+/** Die ersten drei Byte einer MAC-Adresse (Herstellerkennung) in Großbuchstaben, sonst null. */
+export function macPrefix(mac: string): string | null {
+  const hex = mac.replace(/[:-]/g, '').toUpperCase();
+  return /^[0-9A-F]{12}$/.test(hex) ? hex.slice(0, 6) : null;
+}
+
+/**
+ * Zufällige („private“) MAC-Adresse: das „lokal verwaltet“-Bit im ersten Byte ist gesetzt.
+ * Moderne Handys nutzen sie je WLAN; einen Hersteller gibt es dazu nicht.
+ */
+export function isRandomMac(mac: string): boolean {
+  const prefix = macPrefix(mac);
+  return prefix !== null && (parseInt(prefix.slice(0, 2), 16) & 0x02) !== 0;
+}

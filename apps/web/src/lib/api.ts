@@ -159,6 +159,8 @@ export const api = {
   audit: () => request<AuditEntry[]>('GET', '/audit'),
 
   ipam: () => request<IpamData>('GET', '/ipam'),
+  ipamVendors: (prefixes: string[]) =>
+    request<Record<string, string | null>>('GET', `/ipam/vendors?prefixes=${prefixes.join(',')}`),
   ipamIp: (address: string) => request<IpamIpDetail>('GET', `/ipam/ip/${address}`),
   ipamUsage: () => request<IpamUsage>('GET', '/ipam/usage'),
   ipamScan: () => request<IpamScanStatus>('GET', '/ipam/scan'),

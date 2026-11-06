@@ -7,6 +7,8 @@
   import { formatDuration } from '$lib/format';
   import { theme } from '$lib/theme.svelte';
   import { toasts } from '$lib/toasts.svelte';
+  import { matchesAll, tokensOf } from '$lib/list-filter';
+  import { vendors } from '$lib/vendors.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import ReservationForm, { type ReservationValues } from '$lib/components/ReservationForm.svelte';
   import TechNav from '$lib/components/TechNav.svelte';
@@ -55,16 +57,28 @@
   const reservations = $derived<Reservation[]>(
     scopes.flatMap((s) => s.reservations.map((r) => ({ ...r, scope: s.name }))),
   );
-  const matches = (parts: (string | null)[]) => {
-    const q = query.trim().toLowerCase();
-    return !q || parts.some((p) => p?.toLowerCase().includes(q));
-  };
+  // Alle Suchbegriffe müssen vorkommen; Hersteller, Scope und Art zählen mit.
+  const matches = (parts: (string | null)[]) =>
+    matchesAll(parts.filter(Boolean).join(' ').toLocaleLowerCase('de'), tokensOf(query));
+  $effect(() => {
+    void vendors.ensure([
+      ...leases.map((l) => l.hardwareAddress),
+      ...reservations.map((r) => r.hardwareAddress),
+    ]);
+  });
   const leaseRows = $derived(
     leases
       .filter(
         (l) =>
           (!scopeFilter || l.scope === scopeFilter) &&
-          matches([l.address, l.hostName, l.hardwareAddress]),
+          matches([
+            l.address,
+            l.hostName,
+            l.hardwareAddress,
+            vendors.label(l.hardwareAddress),
+            l.scope,
+            l.type === 'Reserved' ? 'reserviert' : 'dynamisch',
+          ]),
       )
       .sort(byAddress),
   );
@@ -73,7 +87,14 @@
       .filter(
         (r) =>
           (!scopeFilter || r.scope === scopeFilter) &&
-          matches([r.address, r.hostName, r.hardwareAddress, r.comments]),
+          matches([
+            r.address,
+            r.hostName,
+            r.hardwareAddress,
+            vendors.label(r.hardwareAddress),
+            r.comments,
+            r.scope,
+          ]),
       )
       .sort(byAddress),
   );
@@ -394,7 +415,7 @@
           id="dhcp-search"
           class="input w-52 py-1.5"
           type="search"
-          placeholder="IP, Name oder MAC …"
+          placeholder="IP, Name, MAC, Hersteller …"
           bind:value={query}
         />
         {#if auth.isAdmin && scopes.length > 0}
@@ -435,7 +456,12 @@
                   <td class="max-w-48 truncate px-2 py-2" title={lease.hostName ?? ''}
                     >{lease.hostName ?? '–'}</td
                   >
-                  <td class="px-2 py-2 font-mono text-xs">{lease.hardwareAddress}</td>
+                  <td class="px-2 py-2 font-mono text-xs">
+                    {lease.hardwareAddress}
+                    <span class="block font-sans text-fg-muted"
+                      >{vendors.label(lease.hardwareAddress)}</span
+                    >
+                  </td>
                   <td class="px-2 py-2">
                     <span
                       class="rounded px-1.5 py-0.5 text-[11px] font-medium"
@@ -516,7 +542,12 @@
                   <td class="max-w-48 truncate px-2 py-2" title={r.hostName ?? ''}
                     >{r.hostName ?? '–'}</td
                   >
-                  <td class="px-2 py-2 font-mono text-xs">{r.hardwareAddress}</td>
+                  <td class="px-2 py-2 font-mono text-xs">
+                    {r.hardwareAddress}
+                    <span class="block font-sans text-fg-muted"
+                      >{vendors.label(r.hardwareAddress)}</span
+                    >
+                  </td>
                   <td class="max-w-64 truncate px-2 py-2 text-fg-muted" title={r.comments ?? ''}
                     >{r.comments ?? ''}</td
                   >

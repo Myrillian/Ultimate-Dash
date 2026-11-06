@@ -6,6 +6,7 @@ import type { IpamScanner } from '../ipam/scanner.js';
 import type { IpamRepository } from '../ipam/repository.js';
 import type { IpamSyncService } from '../ipam/sync.js';
 import type { IpamUsageService } from '../ipam/usage.js';
+import { vendorOfPrefix } from '../ipam/vendors.js';
 import { NotFoundError } from '../db/repository.js';
 import { TechnitiumError } from '../technitium/client.js';
 
@@ -36,6 +37,24 @@ export async function ipamRoutes(
   app.get('/ipam/usage', async (_request, reply) => {
     reply.header('cache-control', 'no-store');
     return usage.usage(repo.all());
+  });
+
+  // Hersteller zu MAC-Kennungen (erste drei Byte); Lesen, aus der mitgelieferten IEEE-Liste.
+  app.get('/ipam/vendors', async (request, reply) => {
+    reply.header('cache-control', 'private, max-age=86400');
+    const { prefixes } = z
+      .object({
+        prefixes: z
+          .string()
+          .max(20_000)
+          .transform((value) => [...new Set(value.split(',').filter(Boolean))].slice(0, 2000)),
+      })
+      .parse(request.query);
+    return Object.fromEntries(
+      prefixes
+        .filter((p) => /^[0-9A-Fa-f]{6}$/.test(p))
+        .map((p) => [p.toUpperCase(), vendorOfPrefix(p)]),
+    ) satisfies Record<string, string | null>;
   });
 
   // Alles zu einer Adresse für das Seitenfenster (Lesen; auch für Nur-lesen-Benutzer).
