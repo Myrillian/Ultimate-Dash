@@ -107,7 +107,7 @@
       <input
         id="view-name-{scope}"
         class="input min-w-0 flex-1 py-1 text-xs"
-        placeholder="Aktuelle Ansicht speichern als …"
+        placeholder="Aktuelle Ansicht benennen …"
         maxlength="60"
         bind:value={name}
       />

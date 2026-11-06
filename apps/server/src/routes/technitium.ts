@@ -114,6 +114,9 @@ export async function technitiumRoutes(
 
   app.get('/audit', async (request, reply) => {
     if (!requireAdmin(request, reply)) return reply;
-    return audit.list(200);
+    const { limit } = z
+      .object({ limit: z.coerce.number().int().min(1).max(1000).default(500) })
+      .parse(request.query);
+    return audit.list(limit);
   });
 }

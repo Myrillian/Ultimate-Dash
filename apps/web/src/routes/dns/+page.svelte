@@ -277,7 +277,7 @@
   <header class="flex flex-wrap items-center gap-3">
     <a href="/" class="icon-btn" aria-label="Zurück zum Dashboard"><UiIcon name="back" /></a>
     <h1 class="flex items-center gap-2 text-xl font-semibold tracking-tight">
-      <UiIcon name="server" size={20} class="text-fg-muted" /> DNS-Zonen und Records
+      <UiIcon name="server" size={20} class="text-fg-muted" /> Zonen und Records
     </h1>
     <TechNav />
     <div class="ml-auto flex items-center gap-1">
