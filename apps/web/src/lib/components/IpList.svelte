@@ -2,9 +2,12 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import {
+    ipamHintLabels,
+    ipamHintsFromClaims,
     ipv4ToInt,
     type IpamAddressUsage,
     type IpamCategory,
+    type IpamHintKind,
     type IpamRange,
   } from '@ultimate-dash/shared';
   import { auth } from '$lib/auth.svelte';
@@ -67,6 +70,7 @@
   const statusSel = $derived(splitList(params.get('status')));
   const flagSel = $derived(splitList(params.get('flag')));
   const catSel = $derived(splitList(params.get('cat')));
+  const hintSel = $derived(splitList(params.get('hint')));
   const sort = $derived(parseSort(params.get('sort'), SORT_KEYS, DEFAULT_SORT));
 
   function setParams(changes: Record<string, string | null>) {
@@ -99,10 +103,11 @@
     else if (group === 'status') listParam('status', statusSel, value);
     else if (group === 'flag') listParam('flag', flagSel, value);
     else if (group === 'cat') listParam('cat', catSel, value);
+    else if (group === 'hint') listParam('hint', hintSel, value);
   };
   const reset = () => {
     typed = null;
-    setParams({ q: null, type: null, status: null, flag: null, cat: null });
+    setParams({ q: null, type: null, status: null, flag: null, cat: null, hint: null });
   };
   const sortBy = (key: string) => {
     const next = nextSort(sort, key);
@@ -129,7 +134,7 @@
   }
   const visible = (key: string) => !hidden.includes(key);
 
-  const VIEW_KEYS = ['q', 'type', 'status', 'flag', 'cat', 'sort'] as const;
+  const VIEW_KEYS = ['q', 'type', 'status', 'flag', 'cat', 'hint', 'sort'] as const;
   function applyView(params: Record<string, string>, hiddenColumns: string[]) {
     typed = null;
     setParams(Object.fromEntries(VIEW_KEYS.map((key) => [key, params[key] ?? null])));
@@ -160,8 +165,10 @@
       const status = row.alive === null ? 'unchecked' : row.alive ? 'online' : 'offline';
       const sources = [...new Set(row.claims.map((c) => sourceLabel[c.source]))];
       const scopes = [...new Set(row.claims.map((c) => c.scope).filter((s): s is string => !!s))];
+      const hints = ipamHintsFromClaims(row.claims);
       return {
         row,
+        hints,
         names,
         macs,
         vendorNames,
@@ -180,6 +187,7 @@
           category?.name ?? '',
           row.discovered ? 'entdeckt' : '',
           row.conflict ? 'konflikt' : '',
+          ...hints.map((h) => ipamHintLabels[h]),
         ]
           .join(' ')
           .toLocaleLowerCase('de'),
@@ -219,6 +227,8 @@
         const flags = [e.row.discovered ? 'discovered' : '', e.row.conflict ? 'conflict' : ''];
         if (!flagSel.some((f) => flags.includes(f))) return false;
       }
+      if (hintSel.length > 0 && !hintSel.some((h) => e.hints.includes(h as IpamHintKind)))
+        return false;
       if (catSel.length > 0 && !catSel.includes(e.category ? String(e.category.id) : 'none'))
         return false;
       return true;
@@ -267,6 +277,17 @@
         value,
         label: flagLabel[value],
         count: count((e) => (value === 'discovered' ? e.row.discovered : e.row.conflict)),
+      })),
+    },
+    {
+      key: 'hint',
+      label: 'Hinweis',
+      selected: hintSel,
+      // PTR kennt die Liste nicht; ein fehlender PTR steht im Seitenfenster.
+      options: (['dns-missing', 'name-differs'] as const).map((value) => ({
+        value,
+        label: ipamHintLabels[value],
+        count: count((e) => e.hints.includes(value)),
       })),
     },
     {
@@ -363,6 +384,13 @@
               {#if visible('name')}
                 <td class="px-3 py-2">
                   {#each e.names as name (name)}<span class="block">{name}</span>{:else}–{/each}
+                  {#each e.hints as hint (hint)}
+                    <span
+                      class="mt-0.5 mr-1 inline-block rounded-full px-1.5 py-0.5 text-[11px] font-semibold"
+                      style="color: var(--discovered); border: 1px solid var(--discovered)"
+                      >{ipamHintLabels[hint]}</span
+                    >
+                  {/each}
                 </td>
               {/if}
               {#if visible('type')}

@@ -570,6 +570,24 @@ export async function startFakeTechnitium(port = 0, token = 'test-token'): Promi
           record.ttl = Number(params.ttl ?? record.ttl);
           record.disabled = params.disable === 'true';
           record.comments = params.comments || undefined;
+          // Wie Technitium: mit ptr=true wird der PTR-Eintrag zur Adresse angelegt oder angepasst.
+          if (params.type === 'A' && params.ptr === 'true') {
+            const ip = String(record.rData.ipAddress);
+            const ptrName = `${ip.split('.').reverse().join('.')}.in-addr.arpa`;
+            const reverse = Object.entries(fake.records).find(
+              ([zone]) => zone.endsWith('.in-addr.arpa') && ptrName.endsWith(`.${zone}`),
+            )?.[1];
+            const existing = reverse?.find((r) => r.name === ptrName && r.type === 'PTR');
+            if (existing) existing.rData.ptrName = record.name;
+            else
+              reverse?.push({
+                name: ptrName,
+                type: 'PTR',
+                ttl: record.ttl,
+                disabled: false,
+                rData: { ptrName: record.name },
+              });
+          }
           return send({ status: 'ok', response: {} });
         }
         case 'zones/records/delete': {
