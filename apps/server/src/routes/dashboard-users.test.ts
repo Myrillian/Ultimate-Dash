@@ -18,6 +18,7 @@ const config: AppConfig = {
   migrationsFolder,
   webRoot: null,
   statusIntervalSeconds: 60,
+  feedIntervalMinutes: 30,
   statusTimeoutMs: 1000,
   logLevel: 'silent',
   oidc: null,

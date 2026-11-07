@@ -35,6 +35,7 @@
   import RangeForm from '$lib/components/RangeForm.svelte';
   import TechNav from '$lib/components/TechNav.svelte';
   import UiIcon from '$lib/components/UiIcon.svelte';
+  import SettingsMenu from '$lib/components/SettingsMenu.svelte';
   import UserMenu from '$lib/components/UserMenu.svelte';
 
   let data = $state<IpamData>({ networks: [], categories: [], ranges: [] });
@@ -397,6 +398,7 @@
       >
         <UiIcon name={theme.current === 'dark' ? 'sun' : 'moon'} />
       </button>
+      <SettingsMenu />
       <UserMenu />
     </div>
   </header>

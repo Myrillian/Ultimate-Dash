@@ -1,5 +1,6 @@
 import type { DashboardData, ServerEvent, ServiceStatus } from '@ultimate-dash/shared';
 import { api } from './api.js';
+import { news } from './feeds.svelte.js';
 
 export type ConnectionState = 'connecting' | 'live' | 'offline';
 
@@ -30,6 +31,7 @@ class DashboardState {
       this.connection = 'live';
       // Nach einem Verbindungsabbruch könnten Änderungen verpasst worden sein.
       void this.load();
+      void news.load();
     };
     source.onerror = () => {
       this.connection = source.readyState === EventSource.CLOSED ? 'offline' : 'connecting';
@@ -42,6 +44,8 @@ class DashboardState {
         this.statuses = next;
       } else if (event.type === 'dashboard-changed') {
         void this.load();
+      } else if (event.type === 'feeds-changed') {
+        void news.load();
       }
     };
   }

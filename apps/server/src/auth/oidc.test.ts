@@ -134,6 +134,7 @@ async function start(overrides: Partial<OidcConfig> = {}, withAdmin = true) {
     migrationsFolder: fileURLToPath(new URL('../../drizzle', import.meta.url)),
     webRoot: null,
     statusIntervalSeconds: 60,
+    feedIntervalMinutes: 30,
     statusTimeoutMs: 1000,
     logLevel: 'silent',
     oidc: oidcConfig(overrides),

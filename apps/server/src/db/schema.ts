@@ -195,6 +195,50 @@ export const ipamHosts = sqliteTable('ipam_hosts', {
   lastCheckedAt: text('last_checked_at').notNull(),
 });
 
+/** RSS-/Atom-Feeds, die der Server regelmäßig abruft; gelten für alle Benutzer, Admins verwalten sie. */
+export const feeds = sqliteTable('feeds', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  url: text('url').notNull().unique(),
+  topic: text('topic').notNull(),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
+  /** Für bedingte Abrufe (304 Not Modified). */
+  etag: text('etag'),
+  lastModified: text('last_modified'),
+  lastFetchedAt: text('last_fetched_at'),
+  lastError: text('last_error'),
+  /** Fehlversuche in Folge; verlängert den Abstand bis zum nächsten Abruf. */
+  failures: integer('failures').notNull().default(0),
+  nextFetchAt: text('next_fetch_at'),
+  createdAt: timestamps.createdAt,
+});
+
+/** Zwischengespeicherte Meldungen der Feeds. */
+export const feedItems = sqliteTable(
+  'feed_items',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    feedId: integer('feed_id')
+      .notNull()
+      .references(() => feeds.id, { onDelete: 'cascade' }),
+    guid: text('guid').notNull(),
+    title: text('title').notNull(),
+    link: text('link').notNull(),
+    summary: text('summary'),
+    imageUrl: text('image_url'),
+    publishedAt: text('published_at').notNull(),
+    /** Wann der Server die Meldung zum ersten Mal gesehen hat. */
+    fetchedAt: text('fetched_at')
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  },
+  (table) => [
+    uniqueIndex('feed_items_unique').on(table.feedId, table.guid),
+    index('feed_items_published_idx').on(table.publishedAt),
+  ],
+);
+
 /** Tageswerte je Netz für den Verlauf der Belegung (ein Eintrag pro Netz und Tag). */
 export const ipamNetworkHistory = sqliteTable(
   'ipam_network_history',

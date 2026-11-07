@@ -13,4 +13,8 @@ export interface ServiceStatus {
 }
 
 /** Ereignisse, die der Server per Server-Sent Events an den Browser schickt. */
-export type ServerEvent = { type: 'status'; data: ServiceStatus[] } | { type: 'dashboard-changed' };
+export type ServerEvent =
+  | { type: 'status'; data: ServiceStatus[] }
+  | { type: 'dashboard-changed' }
+  /** Neue RSS-Meldungen oder geänderte Feeds; betrifft alle Benutzer. */
+  | { type: 'feeds-changed' };
