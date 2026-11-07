@@ -66,9 +66,30 @@ export const users = sqliteTable('users', {
   role: text('role', { enum: ['admin', 'viewer'] })
     .notNull()
     .default('viewer'),
+  /** Für „Passwort vergessen“ per E-Mail; optional. */
+  email: text('email').unique(),
+  /** „Passwort vergessen“ wurde angefragt, aber keine Mail war möglich; Admins sehen den Hinweis. */
+  resetRequestedAt: text('reset_requested_at'),
   createdAt: timestamps.createdAt,
   lastLoginAt: text('last_login_at'),
 });
+
+/** Einmal-Tokens für das Zurücksetzen des Passworts (per Mail, Admin oder Kommandozeile). */
+export const passwordResets = sqliteTable(
+  'password_resets',
+  {
+    /** SHA-256 des Tokens; das Token selbst steht nur im Link. */
+    id: text('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: text('expires_at').notNull(),
+    /** Woher der Link stammt: mail, admin oder cli. */
+    source: text('source', { enum: ['mail', 'admin', 'cli'] }).notNull(),
+    createdAt: timestamps.createdAt,
+  },
+  (table) => [index('password_resets_user_idx').on(table.userId)],
+);
 
 export const sessions = sqliteTable(
   'sessions',

@@ -47,6 +47,8 @@
     pin: '<path d="M12 17v5M9 3h6l-1 7 3 3H7l3-3-1-7Z"/>',
     unpin: '<path d="M12 17v5M9 3h6l-1 7 3 3H7l3-3-1-7ZM3 3l18 18"/>',
     back: '<path d="m15 18-6-6 6-6"/>',
+    mail: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>',
+    link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
     history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 3"/>',
   } as const;
   export type UiIconName = keyof typeof paths;

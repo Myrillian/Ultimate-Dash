@@ -1,6 +1,8 @@
 <script lang="ts">
   import '../app.css';
   import { onMount } from 'svelte';
+  import { page } from '$app/state';
+  import { RESET_PATH } from '@ultimate-dash/shared';
   import { auth } from '$lib/auth.svelte';
   import AuthScreen from '$lib/components/AuthScreen.svelte';
   import Toaster from '$lib/components/Toaster.svelte';
@@ -10,7 +12,10 @@
   onMount(() => void auth.load());
 </script>
 
-{#if !auth.ready}
+<!-- Die Reset-Seite funktioniert ohne Anmeldung, das Token aus dem Link genügt. -->
+{#if page.url.pathname === RESET_PATH}
+  {@render children()}
+{:else if !auth.ready}
   <div class="grid min-h-dvh place-items-center" aria-busy="true" aria-label="Lädt"></div>
 {:else if auth.error && !auth.user}
   <main class="grid min-h-dvh place-items-center px-4">

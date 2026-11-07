@@ -369,9 +369,140 @@ describe('DHCP', () => {
     const all = await leases();
     expect(all).toHaveLength(3);
     expect(all.find((l) => l.address === '10.10.10.102')).toMatchObject({
+      server: 'main',
       type: 'Dynamic',
       hostName: null,
-      expires: '11/07/2026 20:00:00',
+      obtained: '2026-11-06T08:00:00.123Z',
+      expires: '2026-11-07T20:00:00.765Z',
+    });
+  });
+
+  describe('mit zweitem Technitium-Server', () => {
+    let second: FakeTechnitium;
+    beforeEach(async () => {
+      second = await startFakeTechnitium(0, 'zweites-token');
+      // Der zweite Server bedient ein eigenes Netz mit eigenen Leases.
+      second.dhcp.scopes = [
+        {
+          name: 'Gäste',
+          enabled: true,
+          startingAddress: '10.10.30.100',
+          endingAddress: '10.10.30.200',
+          subnetMask: '255.255.255.0',
+          routerAddress: '10.10.30.1',
+          domainName: 'gast.home.lan',
+          exclusions: [],
+          reservedLeases: [
+            {
+              hostName: 'tv',
+              hardwareAddress: 'AA-BB-CC-00-00-31',
+              address: '10.10.30.150',
+              comments: null,
+            },
+          ],
+        },
+      ];
+      second.dhcp.leases = [
+        {
+          scope: 'Gäste',
+          type: 'Dynamic',
+          hardwareAddress: 'AA-BB-CC-00-00-30',
+          address: '10.10.30.101',
+          hostName: 'handy',
+        },
+      ];
+    });
+    afterEach(() => second.close());
+
+    const addSecond = (body: object = {}) =>
+      call('POST', '/api/technitium/dhcp/servers', {
+        name: 'dns2',
+        url: second.url,
+        token: second.token,
+        ...body,
+      });
+
+    it('liest Scopes, Leases und Reservierungen beider Server', async () => {
+      await connect();
+      const added = await addSecond();
+      expect(added.statusCode).toBe(200);
+      const id = added.json().id as string;
+      expect(added.body).not.toContain(second.token);
+
+      const list = await scopes();
+      expect(list.map((s) => [s.name, s.server === 'main' ? 'main' : 'zweiter'])).toEqual([
+        ['Gäste', 'zweiter'],
+        ['IoT', 'main'],
+        ['LAN', 'main'],
+      ]);
+      expect(list[0]).toMatchObject({ server: id, serverName: 'dns2' });
+      expect(list[0]!.reservations).toHaveLength(1);
+
+      const all = await leases();
+      expect(all).toHaveLength(4);
+      expect(all.find((l) => l.address === '10.10.30.101')).toMatchObject({
+        server: id,
+        serverName: 'dns2',
+        type: 'Dynamic',
+      });
+
+      // Änderungen gehen an den Server, der den Scope bedient.
+      expect(
+        (
+          await call('POST', '/api/technitium/dhcp/leases/action', {
+            server: id,
+            scope: 'Gäste',
+            hardwareAddress: 'AA-BB-CC-00-00-30',
+            action: 'reserve',
+          })
+        ).statusCode,
+      ).toBe(204);
+      expect(second.dhcp.leases[0]!.type).toBe('Reserved');
+      expect(fake.dhcp.leases.every((l) => l.scope !== 'Gäste')).toBe(true);
+
+      const unknown = await call('POST', '/api/technitium/dhcp/scopes/state', {
+        server: 'gibt-es-nicht',
+        scope: 'LAN',
+        enabled: false,
+      });
+      expect(unknown.statusCode).toBe(404);
+    });
+
+    it('nutzt ohne eigenes Token das der Hauptverbindung', async () => {
+      await connect();
+      second.token = fake.token;
+      const added = await addSecond({ token: '' });
+      expect(added.statusCode).toBe(200);
+      expect(added.json()).toMatchObject({ ownToken: false, primary: false });
+      expect(second.requests.at(-1)!.authorization).toBe(`Bearer ${fake.token}`);
+    });
+
+    it('prüft neue Server und lehnt Doppelte ab', async () => {
+      await connect();
+      const wrong = await addSecond({ token: 'falsch' });
+      expect(wrong.statusCode).toBe(502);
+      expect(wrong.json().error).toMatch(/Token ist ungültig/);
+      expect((await addSecond({ url: fake.url })).statusCode).toBe(400);
+      await addSecond();
+      expect((await addSecond()).statusCode).toBe(400);
+      const servers = (await call('GET', '/api/technitium/dhcp/servers')).json();
+      expect(servers).toHaveLength(2);
+      expect(servers[0]).toMatchObject({ id: 'main', primary: true });
+    });
+
+    it('zeigt den Hauptserver weiter an, wenn der zweite ausfällt', async () => {
+      await connect();
+      const id = (await addSecond()).json().id as string;
+      await second.close();
+      const list = await scopes();
+      expect(list.map((s) => s.name)).toEqual(['IoT', 'LAN']);
+      const servers = (await call('GET', '/api/technitium/dhcp/servers')).json();
+      expect(servers.find((s: { id: string }) => s.id === id).error).toMatch(/lehnt|erreichbar/);
+
+      // Entfernen
+      expect((await call('DELETE', `/api/technitium/dhcp/servers/${id}`)).statusCode).toBe(204);
+      expect((await call('GET', '/api/technitium/dhcp/servers')).json()).toHaveLength(1);
+      second = await startFakeTechnitium();
     });
   });
 

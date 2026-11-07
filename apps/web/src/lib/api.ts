@@ -21,6 +21,10 @@ import type {
   IpamRangeInput,
   IpamUsage,
   AuthStatus,
+  EmailChangeInput,
+  ForgotPasswordInput,
+  ResetLink,
+  ResetPasswordInput,
   LoginInput,
   PasswordChangeInput,
   SetupInput,
@@ -44,6 +48,8 @@ import type {
   DhcpReservationUpdate,
   DhcpScope,
   DhcpScopeState,
+  DhcpServer,
+  DhcpServerInput,
   DnsRecordCreate,
   DnsRecordDelete,
   DnsRecordList,
@@ -106,6 +112,13 @@ export const api = {
   login: (input: LoginInput) => request<User>('POST', '/auth/login', input),
   logout: () => request<void>('POST', '/auth/logout'),
   changePassword: (input: PasswordChangeInput) => request<void>('POST', '/auth/password', input),
+  changeEmail: (input: EmailChangeInput) => request<User>('PUT', '/auth/email', input),
+  forgotPassword: (input: ForgotPasswordInput) =>
+    request<{ ok: true }>('POST', '/auth/forgot', input),
+  checkReset: (token: string) =>
+    request<{ username: string }>('POST', '/auth/reset/check', { token }),
+  resetPassword: (input: ResetPasswordInput) => request<User>('POST', '/auth/reset', input),
+  createResetLink: (id: number) => request<ResetLink>('POST', `/users/${id}/reset-link`),
   listUsers: () => request<User[]>('GET', '/users'),
   createUser: (input: UserCreateInput) => request<User>('POST', '/users', input),
   updateUser: (id: number, input: UserUpdateInput) => request<User>('PUT', `/users/${id}`, input),
@@ -147,6 +160,13 @@ export const api = {
   updateDnsRecord: (input: DnsRecordUpdate) => request<void>('PUT', '/technitium/records', input),
   deleteDnsRecord: (input: DnsRecordDelete) =>
     request<void>('POST', '/technitium/records/delete', input),
+  dhcpServers: () => request<DhcpServer[]>('GET', '/technitium/dhcp/servers'),
+  addDhcpServer: (input: DhcpServerInput) =>
+    request<DhcpServer>('POST', '/technitium/dhcp/servers', input),
+  updateDhcpServer: (id: string, input: DhcpServerInput) =>
+    request<DhcpServer>('PUT', `/technitium/dhcp/servers/${encodeURIComponent(id)}`, input),
+  deleteDhcpServer: (id: string) =>
+    request<void>('DELETE', `/technitium/dhcp/servers/${encodeURIComponent(id)}`),
   dhcpScopes: () => request<DhcpScope[]>('GET', '/technitium/dhcp/scopes'),
   dhcpLeases: () => request<DhcpLease[]>('GET', '/technitium/dhcp/leases'),
   setDhcpScope: (input: DhcpScopeState) =>

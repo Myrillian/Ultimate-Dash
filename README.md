@@ -73,14 +73,44 @@ pnpm format       # Formatierung
 
 Beim ersten Aufruf legst du im Browser ein Administrator-Konto an. Danach ist das Dashboard nur nach der Anmeldung erreichbar.
 
-- **Administrator**: darf alles bearbeiten und Benutzer verwalten (Benutzermenü oben rechts).
-- **Nur lesen**: darf das eigene Dashboard bearbeiten, in IPAM, DHCP und DNS aber nichts ändern.
+- **Administrator**: darf alles bearbeiten und Benutzer verwalten (Benutzermenü oben rechts → _Benutzer verwalten_).
+- **Benutzer**: darf das eigene Dashboard bearbeiten, in IPAM, DHCP und DNS aber nichts ändern.
+
+In der Benutzerverwaltung legen Admins Benutzer an, ändern ihre Rolle und E-Mail-Adresse, setzen ein neues Passwort oder erzeugen einen Reset-Link und löschen Benutzer. Der letzte Admin lässt sich weder löschen noch herabstufen.
 
 **Dashboard pro Benutzer:** Jeder hat sein eigenes Dashboard (Gruppen, Services, Reihenfolge, Titel). Neue Benutzer starten leer; das bisherige Dashboard gehört dem ersten Administrator. Über _Von anderem Benutzer kopieren_ (Benutzermenü oder Startseite) wählst du per Checkbox Gruppen und Services aus dem Dashboard eines anderen Benutzers; sie werden als unabhängige Kopie übernommen, Gruppen gleichen Namens ergänzt, gleichnamige Services übersprungen. Wer dieselbe Adresse mehrfach hat, wird nur einmal geprüft. IPAM, DNS und DHCP sind für alle gleich.
 
 Passwörter werden mit scrypt gespeichert, Sitzungen laufen 30 Tage und verlängern sich bei Nutzung. Nach zehn Fehlversuchen in 15 Minuten wird die Anmeldung für diesen Benutzernamen und diese IP kurz gesperrt. Hinter einem Reverse-Proxy mit HTTPS wird das Cookie automatisch als `Secure` gesetzt, wenn der Proxy `X-Forwarded-Proto` mitsendet.
 
-**Admin-Passwort vergessen?** Container stoppen, die Datei `/data/ultimate-dash.db` sichern und auf dem Host die Tabellen `users` und `sessions` leeren, zum Beispiel mit `sqlite3 ultimate-dash.db "DELETE FROM sessions; DELETE FROM users;"` (das Image enthält kein `sqlite3`). Beim nächsten Aufruf startet die Ersteinrichtung erneut, Dashboard-Inhalte bleiben erhalten.
+### Passwort vergessen
+
+Auf der Anmeldeseite gibt es _Passwort vergessen?_. Was dann passiert, hängt davon ab, ob ein Mailserver eingerichtet ist:
+
+- **Mit SMTP** (siehe unten) und hinterlegter E-Mail-Adresse bekommt der Benutzer einen Link, der eine Stunde gültig ist und nur einmal funktioniert.
+- **Ohne SMTP** oder ohne Adresse sehen die Admins die Anfrage in der Benutzerverwaltung. Dort erzeugen sie einen Reset-Link (24 Stunden gültig) und geben ihn selbst weiter, oder sie setzen direkt ein neues Passwort.
+
+Die Seite antwortet immer gleich, damit sich darüber keine Benutzernamen ausforschen lassen. Nach dem Zurücksetzen ist der Benutzer auf allen anderen Geräten abgemeldet. Die eigene E-Mail-Adresse pflegt jeder im Benutzermenü.
+
+| Variable            | Standard            | Bedeutung                                                                   |
+| ------------------- | ------------------- | --------------------------------------------------------------------------- |
+| `SMTP_HOST`         |                     | Mailserver; ohne diesen Wert ist der Mailversand aus                        |
+| `SMTP_PORT`         | `587`               | Port                                                                        |
+| `SMTP_SECURE`       | `true` bei Port 465 | Direkt per TLS verbinden; sonst STARTTLS, wenn der Server es anbietet       |
+| `SMTP_USER`         |                     | Benutzername am Mailserver                                                  |
+| `SMTP_PASSWORD`     |                     | Passwort dazu                                                               |
+| `SMTP_FROM`         |                     | Absender, z. B. `Ultimate Dash <dash@example.org>` (Pflicht mit SMTP)       |
+| `SMTP_TLS_INSECURE` | `false`             | Selbstsignierte Zertifikate am Mailserver akzeptieren                       |
+| `PUBLIC_URL`        |                     | Adresse des Dashboards für Links in Mails, z. B. `https://dash.example.org` |
+
+`PUBLIC_URL` ist mit SMTP Pflicht, weil Links in Mails sonst aus dem `Host`-Header gebaut würden, den ein Angreifer fälschen kann.
+
+**Einziger Admin ausgesperrt?** Einen Reset-Link auf der Kommandozeile erzeugen und im Browser öffnen:
+
+```sh
+docker exec -u node ultimate-dash node dist/main.js reset-link admin
+```
+
+Ist `PUBLIC_URL` nicht gesetzt, enthält der Link einen Platzhalter für die Adresse. `-u node` sorgt dafür, dass die Datenbankdateien dem richtigen Benutzer gehören.
 
 ### Anmeldung über OIDC (Authentik, Keycloak, Authelia, Pocket ID …)
 
@@ -99,13 +129,13 @@ Mit OIDC erscheint auf der Anmeldeseite zusätzlich ein Knopf für deinen SSO-An
 | `OIDC_SCOPES`           | `openid profile email` | Für Gruppen ggf. `groups` ergänzen (Authelia, Keycloak mit Mapper)                                                                     |
 | `OIDC_BUTTON_LABEL`     | `Mit SSO anmelden`     | Beschriftung des Knopfs                                                                                                                |
 | `OIDC_GROUPS_CLAIM`     | `groups`               | Claim mit den Gruppen                                                                                                                  |
-| `OIDC_ADMIN_GROUPS`     |                        | Kommagetrennt. Mitglieder werden Admin, alle anderen „Nur lesen“; wird bei jeder Anmeldung abgeglichen                                 |
+| `OIDC_ADMIN_GROUPS`     |                        | Kommagetrennt. Mitglieder werden Admin, alle anderen „Benutzer“; wird bei jeder Anmeldung abgeglichen                                  |
 | `OIDC_ALLOWED_GROUPS`   |                        | Kommagetrennt. Nur Mitglieder dürfen sich anmelden                                                                                     |
 | `OIDC_AUTO_CREATE`      | `true`                 | Unbekannte Konten beim ersten Login anlegen; bei `false` werden nur bereits verknüpfte Konten angemeldet                               |
 | `OIDC_LINK_BY_USERNAME` | `false`                | Erste SSO-Anmeldung mit einem gleichnamigen lokalen Benutzer verbinden (nur, wenn Benutzernamen beim Anbieter nicht frei wählbar sind) |
 | `OIDC_TLS_INSECURE`     | `false`                | Selbstsignierte Zertifikate des Anbieters akzeptieren                                                                                  |
 
-Konten werden über den `sub`-Claim des Anbieters zugeordnet, eine Umbenennung dort ist also unproblematisch. Ohne `OIDC_ADMIN_GROUPS` werden neue SSO-Benutzer als „Nur lesen“ angelegt, und ein Admin vergibt die Rolle in der Benutzerverwaltung. Damit der letzte Admin sich nicht aussperrt, wird er durch fehlende Gruppen nie herabgestuft. Abmelden beendet nur die Sitzung im Dashboard, nicht die beim Anbieter.
+Konten werden über den `sub`-Claim des Anbieters zugeordnet, eine Umbenennung dort ist also unproblematisch. Ohne `OIDC_ADMIN_GROUPS` werden neue SSO-Benutzer mit der Rolle „Benutzer“ angelegt, und ein Admin vergibt die Rolle in der Benutzerverwaltung. Damit der letzte Admin sich nicht aussperrt, wird er durch fehlende Gruppen nie herabgestuft. Abmelden beendet nur die Sitzung im Dashboard, nicht die beim Anbieter.
 
 ## Icons
 

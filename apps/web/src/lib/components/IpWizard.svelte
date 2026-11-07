@@ -1,5 +1,8 @@
 <script lang="ts">
   import {
+    dhcpScopeKey,
+    multipleDhcpServers,
+    parseDhcpScopeKey,
     ipv4InRange,
     ipv4ToInt,
     parseCidr,
@@ -27,6 +30,7 @@
 
   let address = $state('');
   let kind = $state<Kind>('reservation');
+  /** Schlüssel aus Server und Scope, siehe `dhcpScopeKey` */
   let scope = $state('');
   let mac = $state('');
   let hostName = $state('');
@@ -69,6 +73,8 @@
     }),
   );
   const scopeOptions = $derived(networkScopes.length > 0 ? networkScopes : scopes);
+  const multi = $derived(multipleDhcpServers(scopes));
+  const chosenScope = $derived(scopes.find((s) => dhcpScopeKey(s) === scope));
 
   // Beim Öffnen alles zurücksetzen und Scopes/Zonen laden.
   $effect(() => {
@@ -101,12 +107,14 @@
   // Scope und Zone sinnvoll vorbelegen, sobald die Daten da sind.
   $effect(() => {
     if (!open) return;
-    if (!scope || !scopeOptions.some((s) => s.name === scope))
-      scope = poolScope?.name ?? scopeOptions[0]?.name ?? '';
+    if (!scope || !scopeOptions.some((s) => dhcpScopeKey(s) === scope)) {
+      const first = poolScope ?? scopeOptions[0];
+      scope = first ? dhcpScopeKey(first) : '';
+    }
   });
   $effect(() => {
     if (!open) return;
-    const domain = scopes.find((s) => s.name === scope)?.domainName ?? null;
+    const domain = chosenScope?.domainName ?? null;
     if (!zone || !zones.includes(zone))
       zone = domain && zones.includes(domain) ? domain : (zones[0] ?? '');
   });
@@ -155,7 +163,7 @@
     const list: string[] = [];
     if (kind === 'reservation')
       list.push(
-        `DHCP-Reservierung ${address.trim()} für ${mac.trim() || '(MAC fehlt)'} in „${scope}“${hostName.trim() ? ` (Hostname ${hostName.trim()})` : ''}`,
+        `DHCP-Reservierung ${address.trim()} für ${mac.trim() || '(MAC fehlt)'} in „${chosenScope?.name ?? ''}“${hostName.trim() ? ` (Hostname ${hostName.trim()})` : ''}`,
       );
     if (dns && dnsName) {
       list.push(`DNS: A-Eintrag ${dnsName} → ${address.trim()} (TTL ${ttl})`);
@@ -187,7 +195,7 @@
     try {
       if (kind === 'reservation') {
         await api.addDhcpReservation({
-          scope,
+          ...parseDhcpScopeKey(scope),
           hardwareAddress: mac,
           ipAddress: ip,
           hostName,
@@ -212,7 +220,7 @@
       if (e instanceof ApiError && e.issues.length > 0) fieldErrors = e.fieldErrors();
       if (reserved) {
         const undone = await api
-          .deleteDhcpReservation({ scope, hardwareAddress: mac })
+          .deleteDhcpReservation({ ...parseDhcpScopeKey(scope), hardwareAddress: mac })
           .then(() => true)
           .catch(() => false);
         message += undone
@@ -289,7 +297,9 @@
         <label class="grid gap-1">
           <span class="font-medium">Scope</span>
           <select class="field" bind:value={scope}>
-            {#each scopeOptions as s (s.name)}<option value={s.name}>{s.name}</option>{/each}
+            {#each scopeOptions as s (dhcpScopeKey(s))}<option value={dhcpScopeKey(s)}
+                >{s.name}{multi ? ` · ${s.serverName}` : ''}</option
+              >{/each}
           </select>
         </label>
         <label class="grid gap-1">

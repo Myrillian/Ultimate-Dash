@@ -77,6 +77,30 @@ export async function technitiumRoutes(
     return reply.code(204).send();
   });
 
+  // Weitere Technitium-Server, deren DHCP mit ausgelesen wird (z. B. zweiter Knoten).
+  app.get('/technitium/dhcp/servers', async (_request, reply) => {
+    reply.header('cache-control', 'no-store');
+    return dhcp.listServers();
+  });
+
+  app.post('/technitium/dhcp/servers', async (request, reply) => {
+    if (!requireAdmin(request, reply)) return reply;
+    return dhcp.addServer(request.body as never, request.user!);
+  });
+
+  app.put('/technitium/dhcp/servers/:id', async (request, reply) => {
+    if (!requireAdmin(request, reply)) return reply;
+    const { id } = request.params as { id: string };
+    return dhcp.updateServer(id, request.body as never, request.user!);
+  });
+
+  app.delete('/technitium/dhcp/servers/:id', async (request, reply) => {
+    if (!requireAdmin(request, reply)) return reply;
+    const { id } = request.params as { id: string };
+    await dhcp.deleteServer(id, request.user!);
+    return reply.code(204).send();
+  });
+
   app.get('/technitium/dhcp/scopes', async (_request, reply) => {
     reply.header('cache-control', 'no-store');
     return dhcp.scopes();

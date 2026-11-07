@@ -1,10 +1,11 @@
 <script lang="ts">
   import type { DhcpReservation, DhcpScope } from '@ultimate-dash/shared';
-  import { ipv4InRange } from '@ultimate-dash/shared';
+  import { dhcpScopeKey, ipv4InRange, multipleDhcpServers } from '@ultimate-dash/shared';
   import { ApiError } from '$lib/api';
   import Dialog from './Dialog.svelte';
 
   export interface ReservationValues {
+    /** Schlüssel aus Server und Scope, siehe `dhcpScopeKey` */
     scope: string;
     hardwareAddress: string;
     ipAddress: string;
@@ -18,7 +19,7 @@
     /** Vorbelegung beim Anlegen, z. B. aus einer Lease */
     initial?: Partial<ReservationValues> | null;
     /** Bestehende Reservierung beim Bearbeiten */
-    existing?: (DhcpReservation & { scope: string }) | null;
+    existing?: (DhcpReservation & { scope: string; server: string }) | null;
     onclose: () => void;
     onsubmit: (values: ReservationValues) => Promise<void>;
   }
@@ -37,7 +38,8 @@
   let busy = $state(false);
 
   const editing = $derived(existing !== null);
-  const scope = $derived(scopes.find((s) => s.name === values.scope));
+  const scope = $derived(scopes.find((s) => dhcpScopeKey(s) === values.scope));
+  const multi = $derived(multipleDhcpServers(scopes));
   // Nur ein Hinweis: Technitium entscheidet, ob die Adresse passt.
   const outsideRange = $derived(
     !!scope &&
@@ -51,14 +53,14 @@
     general = null;
     values = existing
       ? {
-          scope: existing.scope,
+          scope: dhcpScopeKey({ server: existing.server, name: existing.scope }),
           hardwareAddress: existing.hardwareAddress,
           ipAddress: existing.address,
           hostName: existing.hostName ?? '',
           comments: existing.comments ?? '',
         }
       : {
-          scope: initial?.scope ?? scopes[0]?.name ?? '',
+          scope: initial?.scope ?? (scopes[0] ? dhcpScopeKey(scopes[0]) : ''),
           hardwareAddress: initial?.hardwareAddress ?? '',
           ipAddress: initial?.ipAddress ?? '',
           hostName: initial?.hostName ?? '',
@@ -92,8 +94,12 @@
     <div>
       <label class="field-label" for="res-scope">Scope</label>
       <select id="res-scope" class="input" bind:value={values.scope} disabled={editing}>
-        {#each scopes as s (s.name)}
-          <option value={s.name}>{s.name} ({s.startingAddress} – {s.endingAddress})</option>
+        {#each scopes as s (dhcpScopeKey(s))}
+          <option value={dhcpScopeKey(s)}
+            >{s.name} ({s.startingAddress} – {s.endingAddress}){multi
+              ? ` · ${s.serverName}`
+              : ''}</option
+          >
         {/each}
       </select>
     </div>

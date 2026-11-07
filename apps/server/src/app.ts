@@ -10,6 +10,7 @@ import { createAuditLog } from './db/audit.js';
 import { createRepository, NotFoundError, ValidationError } from './db/repository.js';
 import { EventHub } from './events.js';
 import { registerAuthGuard } from './auth/guard.js';
+import { createSmtpMailer, type Mailer } from './auth/mailer.js';
 import { createOidc } from './auth/oidc.js';
 import { LoginRateLimiter } from './auth/rate-limit.js';
 import { authRoutes } from './auth/routes.js';
@@ -41,6 +42,8 @@ export async function buildApp(
     /** Ping-Prüfung (Tests ersetzen sie) und ob der Zeitplan startet */
     pinger?: Pinger;
     startScanner?: boolean;
+    /** Mailversand (Tests ersetzen ihn); sonst aus config.mail */
+    mailer?: Mailer;
   } = {},
 ) {
   const app = Fastify({
@@ -94,6 +97,12 @@ export async function buildApp(
     store: authStore,
     limiter: new LoginRateLimiter(),
     oidc: config.oidc ? createOidc(config.oidc, authStore) : null,
+    mail: config.mail
+      ? {
+          mailer: options.mailer ?? createSmtpMailer(config.mail),
+          publicUrl: config.mail.publicUrl,
+        }
+      : null,
   });
   await app.register(apiRoutes, { prefix: '/api', repo, events, monitor });
   await app.register(viewRoutes, { prefix: '/api', db });
@@ -114,7 +123,7 @@ export async function buildApp(
     audit,
     envConnection: config.technitium === undefined ? connectionFromEnv() : config.technitium,
   });
-  const dhcp = new DhcpService(technitium);
+  const dhcp = new DhcpService(technitium, db);
   await app.register(technitiumRoutes, { prefix: '/api', technitium, dhcp, audit });
   const ipam = new IpamRepository(db, audit);
   const ipamHosts = new IpamHostStore(db, audit);

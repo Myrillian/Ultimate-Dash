@@ -3,6 +3,7 @@ import {
   formatCount,
   formatAgo,
   formatDuration,
+  formatLeaseTime,
   formatPercent,
   formatRemaining,
   formatTick,
@@ -51,5 +52,20 @@ describe('formatAgo', () => {
     expect(formatAgo('2026-11-06T11:55:00Z', now)).toBe('vor 5 Min.');
     expect(formatAgo('2026-11-06T09:00:00Z', now)).toBe('vor 3 Std.');
     expect(formatAgo('2026-11-02T12:00:00Z', now)).toBe('vor 4 Tagen');
+  });
+});
+
+describe('Lease-Zeiten', () => {
+  it('liest ISO (aktuelle Versionen) und das alte US-Format', () => {
+    const iso = '2026-11-07T20:00:00.765Z';
+    const local = new Date(Date.parse(iso));
+    const expected = new Intl.DateTimeFormat('de-DE', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(local);
+    expect(formatLeaseTime(iso)).toBe(expected);
+    expect(formatLeaseTime('11/07/2026 20:00:00')).toBe('07.11.26, 20:00');
+    expect(formatLeaseTime('irgendwas')).toBe('irgendwas');
+    expect(formatLeaseTime(null)).toBe('–');
   });
 });

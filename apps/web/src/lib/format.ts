@@ -64,3 +64,20 @@ export function formatAgo(iso: string, now = Date.now()): string {
   if (hours < 48) return `vor ${hours} Std.`;
   return `vor ${Math.round(hours / 24)} Tagen`;
 }
+
+const leaseTime = new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+
+/**
+ * Zeitpunkt einer DHCP-Lease: ISO (aktuelle Technitium-Versionen, UTC) oder „MM/dd/yyyy HH:mm:ss“
+ * (ältere, Serverzeit). Unlesbares bleibt unverändert stehen.
+ */
+export function formatLeaseTime(value: string | null): string {
+  if (!value) return '–';
+  const legacy = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})$/.exec(value);
+  if (legacy) {
+    const [, mo, d, y, h, mi, se] = legacy.map(Number) as number[];
+    return leaseTime.format(new Date(y!, mo! - 1, d!, h!, mi!, se!));
+  }
+  const time = /^\d{4}-\d{2}-\d{2}T/.test(value) ? Date.parse(value) : NaN;
+  return Number.isNaN(time) ? value : leaseTime.format(new Date(time));
+}
