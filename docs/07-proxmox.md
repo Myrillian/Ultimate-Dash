@@ -23,7 +23,7 @@ pveum user token add dashboard@pve ultimate-dash --privsep 1
 pveum acl modify / --tokens 'dashboard@pve!ultimate-dash' --roles PVEAuditor
 ```
 
-Mit „Privilege Separation“ braucht das Token die Rolle selbst. Fehlt sie, liefert Proxmox keinen Fehler, sondern eine leere Liste; Ultimate Dash meldet dann „Das Token sieht keinen Knoten“.
+Mit „Privilege Separation“ braucht das Token die Rolle selbst. Fehlt sie, liefert Proxmox keinen Fehler, sondern Knoten nur mit Name und Status, ohne CPU, RAM, Gäste und Storages. Ultimate Dash meldet das beim Verbindungstest und im Dashboard („Das Token sieht keinen Knoten“ bzw. „… aber keine Werte“), statt Nullen anzuzeigen. Prüfen lässt sich die Vergabe mit `pveum user token permissions dashboard@pve ultimate-dash`.
 
 Alternativ per Umgebungsvariablen `PROXMOX_URL`, `PROXMOX_TOKEN_ID`, `PROXMOX_TOKEN_SECRET`, `PROXMOX_TLS_INSECURE=true`. Dann ist die Verbindung in der Oberfläche nur lesbar.
 
