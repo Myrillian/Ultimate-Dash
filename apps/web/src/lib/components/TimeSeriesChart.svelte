@@ -21,11 +21,13 @@
     /** Ausführlicher Zeitpunkt für den Tooltip */
     formatXLong: (date: Date) => string;
     label: string;
+    /** Höhe der Zeichenfläche in Pixeln */
+    height?: number;
   }
 
-  let { labels, series, formatX, formatXLong, label }: Props = $props();
+  let { labels, series, formatX, formatXLong, label, height = 180 }: Props = $props();
 
-  const HEIGHT = 180;
+  const HEIGHT = $derived(height);
   const PAD = { top: 12, bottom: 26, left: 44 };
 
   let width = $state(600);
@@ -40,7 +42,7 @@
   const ticks = $derived(niceTicks(max));
   const top = $derived(ticks.at(-1)!);
   const plotW = $derived(Math.max(10, width - PAD.left - padRight));
-  const plotH = HEIGHT - PAD.top - PAD.bottom;
+  const plotH = $derived(HEIGHT - PAD.top - PAD.bottom);
 
   const x = (i: number) => PAD.left + (count <= 1 ? plotW / 2 : (i / (count - 1)) * plotW);
   const y = (v: number) => PAD.top + plotH - (v / top) * plotH;

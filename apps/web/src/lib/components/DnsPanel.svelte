@@ -2,7 +2,7 @@
   import { onDestroy, onMount } from 'svelte';
   import type { DnsTopEntry, StatsRange } from '@ultimate-dash/shared';
   import { auth } from '$lib/auth.svelte';
-  import { dns } from '$lib/dns.svelte';
+  import { dns, type DnsView } from '$lib/dns.svelte';
   import { formatCount, formatPercent, formatRemaining } from '$lib/format';
   import { toasts } from '$lib/toasts.svelte';
   import SegmentedBar from './SegmentedBar.svelte';
@@ -158,6 +158,16 @@
     }
   }
 
+  const VIEWS: {
+    value: DnsView;
+    label: string;
+    icon: 'view-bar' | 'view-compact' | 'view-full';
+  }[] = [
+    { value: 'bar', label: 'Als Balken einklappen', icon: 'view-bar' },
+    { value: 'compact', label: 'Kompakt: Kennzahlen und Verlauf', icon: 'view-compact' },
+    { value: 'full', label: 'Vollständig mit Top-Listen', icon: 'view-full' },
+  ];
+
   const rangeLong = $derived(RANGES.find((r) => r.value === dns.range)!.long);
 </script>
 
@@ -170,10 +180,35 @@
   }}
 />
 
+{#snippet viewSwitch()}
+  <div
+    class="inline-flex shrink-0 rounded-lg border border-line bg-elevated p-0.5"
+    role="radiogroup"
+    aria-label="Größe des DNS-Bereichs"
+  >
+    {#each VIEWS as item (item.value)}
+      <button
+        type="button"
+        role="radio"
+        aria-checked={dns.view === item.value}
+        aria-label={item.label}
+        title={item.label}
+        class="grid size-7 place-items-center rounded-md transition"
+        class:bg-muted={dns.view === item.value}
+        class:text-fg={dns.view === item.value}
+        class:text-fg-muted={dns.view !== item.value}
+        onclick={() => dns.setView(item.value)}
+      >
+        <UiIcon name={item.icon} size={15} />
+      </button>
+    {/each}
+  </div>
+{/snippet}
+
 {#if dns.status === 'not-configured'}
   {#if auth.isAdmin}
     <section
-      class="flex flex-wrap items-center gap-4 rounded-2xl border border-dashed border-line p-5"
+      class="flex flex-wrap items-center gap-4 rounded-2xl border border-dashed border-line p-4 sm:p-5"
       aria-label="DNS"
     >
       <span class="grid size-10 place-items-center rounded-xl bg-muted text-fg-muted">
@@ -188,8 +223,69 @@
       <button type="button" class="btn btn-primary" onclick={onconnect}>Verbinden</button>
     </section>
   {/if}
+{:else if dns.status !== 'idle' && dns.view === 'bar'}
+  <!-- Eingeklappt: ein Balken mit Kurzstatistik -->
+  <section
+    class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-line bg-elevated px-3 py-2 sm:px-4"
+    aria-labelledby="dns-title"
+  >
+    <h2 id="dns-title" class="flex items-center gap-2 text-sm font-semibold">
+      <UiIcon name="shield" size={16} class="text-fg-muted" />
+      <span class="sr-only sm:not-sr-only">DNS</span>
+    </h2>
+    <button
+      type="button"
+      class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg text-left text-xs text-fg-muted tabular-nums hover:text-fg sm:gap-x-4 [&>span]:whitespace-nowrap"
+      title="DNS-Bereich ausklappen"
+      onclick={() => dns.setView(dns.lastOpen)}
+    >
+      <span class="sr-only">Ausklappen:</span>
+      {#if t && blocking}
+        <span><b class="font-semibold text-fg">{formatCount(t.queries)}</b> Anfragen</span>
+        <span
+          ><b class="font-semibold text-fg">{formatCount(t.blocked)}</b> geblockt<span
+            class="hidden sm:inline"
+          >
+            ({formatPercent(t.blocked, t.queries)})</span
+          ></span
+        >
+        <span class="hidden sm:inline"
+          ><b class="font-semibold text-fg">{formatPercent(t.cached, t.queries)}</b> Cache</span
+        >
+        <span class="hidden sm:inline"
+          ><b class="font-semibold text-fg">{formatCount(t.clients)}</b> Clients</span
+        >
+        <span class="hidden md:inline">· {RANGES.find((r) => r.value === dns.range)!.label}</span>
+      {:else if dns.status === 'error'}
+        <span class="text-down">Nicht verfügbar</span>
+      {:else}
+        <span>Lädt …</span>
+      {/if}
+    </button>
+    {#if blocking}
+      <span
+        class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+        class:bg-up={blocking.enabled}
+        class:text-white={blocking.enabled}
+        class:bg-muted={!blocking.enabled}
+        role="status"
+      >
+        <UiIcon name={blocking.enabled ? 'shield' : 'shield-off'} size={12} />
+        <span class={blocking.pausedUntil && !blocking.enabled ? '' : 'sr-only sm:not-sr-only'}>
+          {#if blocking.enabled}
+            Aktiv
+          {:else if blocking.pausedUntil}
+            Pause {formatRemaining(pausedMs)}
+          {:else}
+            Aus
+          {/if}
+        </span>
+      </span>
+    {/if}
+    {@render viewSwitch()}
+  </section>
 {:else if dns.status !== 'idle'}
-  <section class="grid gap-4" aria-labelledby="dns-title">
+  <section class="grid min-w-0 gap-4" aria-labelledby="dns-title">
     <!-- Kopfzeile: Titel, Zeitraum (gilt für alles darunter), Blocking -->
     <div class="flex flex-wrap items-center gap-3">
       <h2 id="dns-title" class="flex items-center gap-2 text-sm font-semibold">
@@ -197,13 +293,16 @@
         DNS
         {#if summary}<span class="font-normal text-fg-muted">· {summary.serverDomain}</span>{/if}
       </h2>
+      <div class="ml-auto sm:hidden">{@render viewSwitch()}</div>
       {#if summary}
-        <a href="/dns" class="text-xs text-accent hover:underline">Zonen und Records ›</a>
-        <a href="/dhcp" class="text-xs text-accent hover:underline">DHCP ›</a>
+        <div class="flex w-full gap-3 sm:w-auto">
+          <a href="/dns" class="text-xs text-accent hover:underline">Zonen und Records ›</a>
+          <a href="/dhcp" class="text-xs text-accent hover:underline">DHCP ›</a>
+        </div>
       {/if}
 
       <div
-        class="inline-flex rounded-lg border border-line bg-elevated p-0.5"
+        class="flex w-full rounded-lg border border-line bg-elevated p-0.5 sm:inline-flex sm:w-auto"
         role="radiogroup"
         aria-label="Zeitraum"
       >
@@ -212,7 +311,7 @@
             type="button"
             role="radio"
             aria-checked={dns.range === range.value}
-            class="rounded-md px-2.5 py-1 text-xs font-medium transition"
+            class="flex-1 rounded-md px-2 py-1 text-xs font-medium whitespace-nowrap transition sm:flex-none sm:px-2.5"
             class:bg-muted={dns.range === range.value}
             class:text-fg={dns.range === range.value}
             class:text-fg-muted={dns.range !== range.value}
@@ -222,7 +321,7 @@
       </div>
 
       {#if blocking}
-        <div class="ml-auto flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
           <span
             class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
             class:bg-up={blocking.enabled}
@@ -304,6 +403,7 @@
           {/if}
         </div>
       {/if}
+      <div class="hidden sm:block" class:sm:ml-auto={!blocking}>{@render viewSwitch()}</div>
     </div>
 
     {#if dns.status === 'error' && !summary}
@@ -333,16 +433,18 @@
       <!-- Kennzahlen -->
       <dl class="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {#each [{ label: 'Anfragen', value: formatCount(t.queries), sub: rangeLong }, { label: 'Geblockt', value: formatCount(t.blocked), sub: `${formatPercent(t.blocked, t.queries)} aller Anfragen` }, { label: 'Aus dem Cache', value: formatPercent(t.cached, t.queries), sub: `${formatCount(t.cached)} Antworten` }, { label: 'Clients', value: formatCount(t.clients), sub: `${formatCount(blocking!.blockedDomains)} Domains auf Sperrlisten` }] as tile (tile.label)}
-          <div class="rounded-2xl border border-line bg-elevated p-4">
+          <div class="min-w-0 rounded-2xl border border-line bg-elevated p-3 sm:p-4">
             <dt class="text-xs text-fg-muted">{tile.label}</dt>
-            <dd class="mt-1 text-2xl font-semibold tracking-tight">{tile.value}</dd>
+            <dd class="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">{tile.value}</dd>
             <dd class="mt-0.5 truncate text-xs text-fg-muted">{tile.sub}</dd>
           </div>
         {/each}
       </dl>
 
       <div
-        class="grid gap-4 transition-opacity lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
+        class="grid gap-4 transition-opacity {dns.view === 'full'
+          ? 'lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]'
+          : ''}"
         class:opacity-60={dns.status === 'loading'}
       >
         <div class="grid gap-3 rounded-2xl border border-line bg-elevated p-4">
@@ -400,62 +502,71 @@
               formatX={(d) => xFormats[dns.range].format(d)}
               formatXLong={(d) => longFormats[dns.range].format(d)}
               label="Anfragen und geblockte Anfragen, {rangeLong}"
+              height={dns.view === 'compact' ? 120 : 180}
             />
           {/if}
 
-          <div class="border-t border-line pt-3">
-            <h3 class="mb-2 text-sm font-semibold">Woher die Antworten kamen</h3>
-            <SegmentedBar parts={answerParts} label="Antworten nach Herkunft" />
-          </div>
+          {#if dns.view === 'full'}
+            <div class="border-t border-line pt-3">
+              <h3 class="mb-2 text-sm font-semibold">Woher die Antworten kamen</h3>
+              <SegmentedBar parts={answerParts} label="Antworten nach Herkunft" />
+            </div>
+          {/if}
         </div>
 
-        <div class="grid content-start gap-3 rounded-2xl border border-line bg-elevated p-4">
-          <div class="flex gap-1 rounded-lg bg-muted p-0.5" role="tablist" aria-label="Top-Listen">
-            {#each [{ value: 'domains', label: 'Domains' }, { value: 'blocked', label: 'Geblockt' }, { value: 'clients', label: 'Clients' }] as const as tab (tab.value)}
-              <button
-                type="button"
-                role="tab"
-                id="dns-tab-{tab.value}"
-                aria-selected={topTab === tab.value}
-                aria-controls="dns-top-panel"
-                class="flex-1 rounded-md px-2 py-1 text-xs font-medium transition"
-                class:bg-elevated={topTab === tab.value}
-                class:shadow-sm={topTab === tab.value}
-                class:text-fg-muted={topTab !== tab.value}
-                onclick={() => (topTab = tab.value)}>{tab.label}</button
-              >
-            {/each}
+        {#if dns.view === 'full'}
+          <div class="grid content-start gap-3 rounded-2xl border border-line bg-elevated p-4">
+            <div
+              class="flex gap-1 rounded-lg bg-muted p-0.5"
+              role="tablist"
+              aria-label="Top-Listen"
+            >
+              {#each [{ value: 'domains', label: 'Domains' }, { value: 'blocked', label: 'Geblockt' }, { value: 'clients', label: 'Clients' }] as const as tab (tab.value)}
+                <button
+                  type="button"
+                  role="tab"
+                  id="dns-tab-{tab.value}"
+                  aria-selected={topTab === tab.value}
+                  aria-controls="dns-top-panel"
+                  class="flex-1 rounded-md px-2 py-1 text-xs font-medium transition"
+                  class:bg-elevated={topTab === tab.value}
+                  class:shadow-sm={topTab === tab.value}
+                  class:text-fg-muted={topTab !== tab.value}
+                  onclick={() => (topTab = tab.value)}>{tab.label}</button
+                >
+              {/each}
+            </div>
+            <div id="dns-top-panel" role="tabpanel" aria-labelledby="dns-tab-{topTab}">
+              {#if currentTop.entries.length === 0}
+                <p class="py-6 text-center text-sm text-fg-muted">{currentTop.empty}</p>
+              {:else}
+                <ol class="grid gap-2.5">
+                  {#each currentTop.entries as entry (entry.name)}
+                    <li class="grid gap-1">
+                      <div class="flex items-baseline gap-2 text-sm">
+                        <span class="min-w-0 flex-1 truncate" title={entry.name}>
+                          {entry.domain ?? entry.name}
+                          {#if entry.domain}<span class="text-xs text-fg-muted">{entry.name}</span
+                            >{/if}
+                        </span>
+                        <span class="text-xs text-fg-muted tabular-nums"
+                          >{formatCount(entry.hits)}</span
+                        >
+                      </div>
+                      <div class="h-1.5 rounded-full bg-muted" aria-hidden="true">
+                        <div
+                          class="h-full rounded-full"
+                          style="width: {(entry.hits / topMax) *
+                            100}%; background: {currentTop.color}"
+                        ></div>
+                      </div>
+                    </li>
+                  {/each}
+                </ol>
+              {/if}
+            </div>
           </div>
-          <div id="dns-top-panel" role="tabpanel" aria-labelledby="dns-tab-{topTab}">
-            {#if currentTop.entries.length === 0}
-              <p class="py-6 text-center text-sm text-fg-muted">{currentTop.empty}</p>
-            {:else}
-              <ol class="grid gap-2.5">
-                {#each currentTop.entries as entry (entry.name)}
-                  <li class="grid gap-1">
-                    <div class="flex items-baseline gap-2 text-sm">
-                      <span class="min-w-0 flex-1 truncate" title={entry.name}>
-                        {entry.domain ?? entry.name}
-                        {#if entry.domain}<span class="text-xs text-fg-muted">{entry.name}</span
-                          >{/if}
-                      </span>
-                      <span class="text-xs text-fg-muted tabular-nums"
-                        >{formatCount(entry.hits)}</span
-                      >
-                    </div>
-                    <div class="h-1.5 rounded-full bg-muted" aria-hidden="true">
-                      <div
-                        class="h-full rounded-full"
-                        style="width: {(entry.hits / topMax) *
-                          100}%; background: {currentTop.color}"
-                      ></div>
-                    </div>
-                  </li>
-                {/each}
-              </ol>
-            {/if}
-          </div>
-        </div>
+        {/if}
       </div>
     {/if}
   </section>
