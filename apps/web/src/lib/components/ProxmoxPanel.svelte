@@ -169,7 +169,7 @@
           >
         {/if}
       {:else if proxmox.status === 'error'}
-        <span class="text-down">Nicht verfügbar</span>
+        <span class="text-down [white-space:normal]!">Nicht verfügbar: {proxmox.error}</span>
       {:else}
         <span>Lädt …</span>
       {/if}
@@ -179,6 +179,14 @@
         <GuestChip id="pve-vms-stopped" label="VMs" count={s.vms} />
         <GuestChip id="pve-cts-stopped" label="CTs" count={s.containers} />
       </div>
+    {/if}
+    {#if proxmox.status === 'error'}
+      {#if s}
+        <span class="text-xs text-down" role="status" title={proxmox.error ?? ''}
+          >Veraltet<span class="sr-only">: {proxmox.error}</span></span
+        >
+      {/if}
+      <button type="button" class="btn py-1 text-xs" onclick={onconnect}>Verbindung prüfen</button>
     {/if}
     {#if offlineNodes.length > 0}
       <span class="rounded-full bg-down px-2 py-0.5 text-xs font-medium text-white" role="status">

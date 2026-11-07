@@ -189,3 +189,13 @@ describe('Proxmox-Kennzahlen', () => {
     expect(fake.requests.length - before).toBe(2);
   });
 });
+
+describe('Proxmox-Kennzahlen ohne Rechte', () => {
+  it('meldet fehlende Rechte statt leerer Werte', async () => {
+    await connect();
+    fake.resources = [];
+    const res = await call('GET', '/api/proxmox/summary');
+    expect(res.statusCode).toBe(502);
+    expect(res.json()).toMatchObject({ code: 'permission' });
+  });
+});

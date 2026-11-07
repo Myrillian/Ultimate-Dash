@@ -50,6 +50,18 @@ export function extraPrivileges(permissions: Record<string, Record<string, numbe
   return [...extra].sort();
 }
 
+/** Ohne Sys.Audit liefert Proxmox keinen Fehler, sondern einfach eine Liste ohne Knoten. */
+function requireNodes(resources: RawResource[]): RawResource[] {
+  const nodes = Array.isArray(resources) ? resources.filter((r) => r.type === 'node') : [];
+  if (nodes.length === 0) {
+    throw new ProxmoxError(
+      'Das Token sieht keinen Knoten. Bitte die Rolle PVEAuditor auf „/“ für das Token vergeben (bei „Privilege Separation“ dem Token selbst, nicht nur dem Benutzer).',
+      'permission',
+    );
+  }
+  return nodes;
+}
+
 export class ProxmoxService {
   private cache: { at: number; value: Promise<ProxmoxSummary> } | null = null;
   private counters: DiskCounters | null = null;
@@ -119,14 +131,7 @@ export class ProxmoxService {
       this.call<RawResource[]>(connection, '/cluster/resources'),
       this.call<Record<string, Record<string, number>>>(connection, '/access/permissions'),
     ]);
-    const nodes = resources.filter((r) => r.type === 'node').map((r) => r.node ?? r.id);
-    // Ohne Sys.Audit liefert Proxmox keinen Fehler, sondern einfach eine leere Liste.
-    if (nodes.length === 0) {
-      throw new ProxmoxError(
-        'Das Token sieht keinen Knoten. Bitte die Rolle PVEAuditor auf „/“ für das Token vergeben (bei „Privilege Separation“ dem Token selbst, nicht nur dem Benutzer).',
-        'permission',
-      );
-    }
+    const nodes = requireNodes(resources).map((r) => r.node ?? r.id);
     const guests = resources.filter((r) => !r.template);
     return {
       version: version.version,
@@ -188,7 +193,7 @@ export class ProxmoxService {
   private async fetchSummary(connection: ProxmoxConnection): Promise<ProxmoxSummary> {
     const resources = await this.call<RawResource[]>(connection, '/cluster/resources');
     const now = Date.now();
-    const online = resources.filter((r) => r.type === 'node' && r.status === 'online');
+    const online = requireNodes(resources).filter((r) => r.status === 'online');
     const rrd = new Map<string, RawRrdPoint[]>();
     await Promise.all(
       online.map(async (node) => {
