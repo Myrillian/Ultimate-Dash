@@ -5,6 +5,7 @@
   import type {
     IpamAddressUsage,
     IpamData,
+    IpamHistory,
     IpamNetwork,
     IpamNetworkUsage,
     IpamRange,
@@ -12,7 +13,7 @@
     IpamSync,
     IpamUsage,
   } from '@ultimate-dash/shared';
-  import { ipv4RangeSize, parseCidr } from '@ultimate-dash/shared';
+  import { ipv4RangeSize, parseCidr, sumIpamStats } from '@ultimate-dash/shared';
   import { api } from '$lib/api';
   import { auth } from '$lib/auth.svelte';
   import { formatAgo, formatPercent } from '$lib/format';
@@ -26,6 +27,8 @@
   import IpPanel from '$lib/components/IpPanel.svelte';
   import IpWizard from '$lib/components/IpWizard.svelte';
   import NetworkForm from '$lib/components/NetworkForm.svelte';
+  import NetStats, { type StatsFilter } from '$lib/components/NetStats.svelte';
+  import TimeSeriesChart from '$lib/components/TimeSeriesChart.svelte';
   import HostDialog from '$lib/components/HostDialog.svelte';
   import ScanDialog from '$lib/components/ScanDialog.svelte';
   import SyncPanel from '$lib/components/SyncPanel.svelte';
@@ -38,6 +41,7 @@
   let usage = $state<IpamUsage>({ available: true, reason: null, networks: {} });
   let sync = $state<IpamSync>({ available: false, reason: null, suggestions: [], drift: [] });
   let scan = $state<IpamScanStatus | null>(null);
+  let history = $state<IpamHistory>({});
   let scanOpen = $state(false);
   let hostForm = $state<{ open: boolean; row: IpamAddressUsage | null }>({
     open: false,
@@ -86,6 +90,54 @@
   );
   const netRanges = $derived(network ? data.ranges.filter((r) => r.networkId === network.id) : []);
   const categoryOf = (id: number) => data.categories.find((c) => c.id === id);
+
+  /** Summe über alle Netze mit bekannter Belegung (Zeile über den Karten) */
+  const totals = $derived.by(() => {
+    const list = data.networks.flatMap((n) => {
+      const u = usage.networks[n.id];
+      return u ? [u.stats] : [];
+    });
+    return list.length > 0 ? sumIpamStats(list) : null;
+  });
+
+  // Verlauf der letzten Tage für das gewählte Netz
+  const HISTORY_DAYS = 30;
+  const dayShort = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' });
+  const dayLong = new Intl.DateTimeFormat('de-DE', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+  const netHistory = $derived(network ? (history[network.id] ?? []) : []);
+  const historySeries = $derived([
+    {
+      key: 'used',
+      label: 'Vergeben',
+      color: 'var(--chart-queries)',
+      values: netHistory.map((p) => p.used),
+      area: true,
+    },
+    ...(netHistory.some((p) => p.online !== null)
+      ? [
+          {
+            key: 'online',
+            label: 'Online',
+            color: 'var(--chart-cached)',
+            values: netHistory.map((p) => p.online ?? 0),
+          },
+        ]
+      : []),
+  ]);
+
+  /** Kachel der Statistik angeklickt: Liste auf genau diese Adressen filtern und hinscrollen. */
+  async function filterList(filter: StatsFilter) {
+    const url = new URL(page.url);
+    for (const key of ['q', 'type', 'status', 'flag', 'cat', 'hint']) url.searchParams.delete(key);
+    for (const [key, value] of Object.entries(filter)) if (value) url.searchParams.set(key, value);
+    await goto(url, { keepFocus: true, noScroll: true, replaceState: true });
+    document.getElementById('belegte-adressen')?.scrollIntoView({ behavior: 'smooth' });
+  }
 
   const GRID_LIMIT = 1024;
   const cells = $derived(
@@ -138,6 +190,7 @@
         ? await api.ipamSync().catch(() => sync)
         : { available: false, reason: null, suggestions: [], drift: [] };
       scan = await api.ipamScan().catch(() => scan);
+      history = await api.ipamHistory(HISTORY_DAYS).catch(() => history);
       error = null;
     } catch (e) {
       error = e instanceof Error ? e.message : 'IPAM-Daten konnten nicht geladen werden';
@@ -404,6 +457,21 @@
           </p>
         </div>
       {:else}
+        {#if totals && data.networks.length > 1}
+          <section
+            aria-label="Alle Netze zusammen"
+            class="grid gap-2 rounded-2xl border border-line bg-elevated p-4"
+          >
+            <p class="text-sm tabular-nums">
+              <span class="font-semibold">Alle Netze</span>
+              <span class="text-fg-muted">
+                · {data.networks.length} Netze · {totals.total.toLocaleString('de-DE')} Adressen, davon
+                {formatPercent(totals.used, totals.total)} vergeben</span
+              >
+            </p>
+            <NetStats stats={totals} wide />
+          </section>
+        {/if}
         <section aria-label="Netze" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {#each data.networks as n (n.id)}
             {@const b = breakdown(n)}
@@ -423,28 +491,11 @@
                 {/if}
               </div>
               {@render usageBar(n)}
-              <div class="flex flex-wrap items-baseline justify-between gap-x-3 text-xs">
-                {#if b.u}
-                  <span class="tabular-nums"
-                    ><span class="font-semibold">{b.u.used}</span> von {b.hosts} belegt ({formatPercent(
-                      b.u.used,
-                      b.hosts,
-                    )})</span
-                  >
-                  {#if b.u.discovered > 0}
-                    <span class="font-medium" style="color: var(--discovered)"
-                      >{b.u.discovered} neu entdeckt</span
-                    >
-                  {/if}
-                  {#if b.u.conflicts > 0}
-                    <span class="font-medium text-down"
-                      >{b.u.conflicts} Konflikt{b.u.conflicts > 1 ? 'e' : ''}</span
-                    >
-                  {/if}
-                {:else}
-                  <span class="text-fg-muted">{b.hosts} Adressen</span>
-                {/if}
-              </div>
+              {#if b.u}
+                <NetStats stats={b.u.stats} />
+              {:else}
+                <p class="text-xs text-fg-muted">{b.hosts} Adressen</p>
+              {/if}
               {#if b.parts.length > 0}
                 <ul class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-fg-muted">
                   {#each new Set(b.parts
@@ -513,30 +564,45 @@
         </p>
       {/each}
 
+      {#if netUsage}
+        <section
+          aria-label="Statistik"
+          class="grid min-w-0 gap-4 rounded-2xl border border-line bg-elevated p-4"
+        >
+          <div class="flex flex-wrap items-baseline gap-x-3">
+            <h3 class="font-semibold">Statistik</h3>
+            <p class="text-xs text-fg-muted">Ein Klick auf eine Kachel filtert die Liste.</p>
+          </div>
+          <NetStats stats={netUsage.stats} variant="full" onfilter={filterList} />
+          <div class="grid gap-2 border-t border-line pt-3">
+            <h4 class="text-sm font-semibold">Verlauf der letzten {HISTORY_DAYS} Tage</h4>
+            <p class="-mt-1 text-xs text-fg-muted">
+              Vergeben: Stand am Ende des Tages. Online: höchster Wert des Tages.
+            </p>
+            {#if netHistory.length < 2}
+              <p class="text-xs text-fg-muted">
+                Der Verlauf füllt sich ab jetzt mit einem Wert pro Tag (nach jeder Ping-Prüfung und
+                stündlich).
+              </p>
+            {:else}
+              <TimeSeriesChart
+                labels={netHistory.map((p) => `${p.day}T12:00:00`)}
+                series={historySeries}
+                formatX={(d) => dayShort.format(d)}
+                formatXLong={(d) => dayLong.format(d)}
+                label="Vergebene und erreichbare Adressen von {network.name}, letzte {HISTORY_DAYS} Tage"
+                height={160}
+              />
+            {/if}
+          </div>
+        </section>
+      {/if}
+
       <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         <section
           aria-label="Adressraster"
           class="grid min-w-0 content-start gap-4 rounded-2xl border border-line bg-elevated p-4"
         >
-          {#if netUsage}
-            <p class="text-sm tabular-nums">
-              <span class="font-semibold">{netUsage.used}</span> von {netUsage.hosts} Adressen belegt
-              ({formatPercent(netUsage.used, netUsage.hosts)})
-              {#if netUsage.lastScanAt}
-                · {netUsage.online} online
-              {/if}
-              {#if netUsage.discovered > 0}
-                · <span class="font-medium" style="color: var(--discovered)"
-                  >{netUsage.discovered} neu entdeckt</span
-                >
-              {/if}
-              {#if netUsage.conflicts > 0}
-                · <span class="font-medium text-down"
-                  >{netUsage.conflicts} Konflikt{netUsage.conflicts > 1 ? 'e' : ''}</span
-                >
-              {/if}
-            </p>
-          {/if}
           {@render scanInfo()}
           {#if cells.length > 0}
             <IpGrid
@@ -657,7 +723,11 @@
         </section>
       </div>
 
-      <section aria-label="Belegte Adressen" class="grid min-w-0 gap-3">
+      <section
+        id="belegte-adressen"
+        aria-label="Belegte Adressen"
+        class="grid min-w-0 scroll-mt-4 gap-3"
+      >
         <h3 class="font-semibold">Belegte Adressen</h3>
         {#if !netUsage}
           <p class="text-sm text-fg-muted">Ohne Verbindung zu Technitium gibt es keine Belegung.</p>

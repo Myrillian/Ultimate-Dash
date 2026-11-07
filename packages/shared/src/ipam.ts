@@ -182,6 +182,12 @@ export interface IpamAddressUsage {
   discovered: boolean;
   /** Mindestens zwei verschiedene Geräte (MAC) beanspruchen die Adresse. */
   conflict: boolean;
+  /** Erste Antwort auf Ping (ISO); null, wenn die Adresse nie geantwortet hat */
+  firstSeen: string | null;
+  /** Ablauf der dynamischen Lease (ISO); null ohne dynamische Lease */
+  leaseExpires: string | null;
+  /** Es gibt einen PTR-Eintrag; null, wenn keine Reverse-Zone die Adresse abdeckt */
+  ptr: boolean | null;
 }
 
 export interface IpamNetworkUsage {
@@ -209,7 +215,53 @@ export interface IpamNetworkUsage {
   /** Antworten beim letzten Ping-Durchlauf */
   online: number;
   lastScanAt: string | null;
+  /** Kennzahlen für die Statistik unter dem Netz */
+  stats: IpamNetworkStats;
 }
+
+/** Kennzahlen eines Netzes; Definitionen in `ipam-stats.ts`. */
+export interface IpamNetworkStats {
+  /** Nutzbare Adressen (ohne Netz- und Broadcast-Adresse) */
+  total: number;
+  used: number;
+  free: number;
+  /** Vergebene Adressen nach Art; „discovered“ = nur per Ping gefunden */
+  byType: { reservation: number; lease: number; static: number; discovered: number };
+  /** Aktive DHCP-Pools im Netz (ohne Ausschlüsse); null, wenn es keinen gibt */
+  pool: { size: number; used: number; free: number } | null;
+  /** Frei und außerhalb der Pools, also für statische Adressen oder Reservierungen nutzbar */
+  freeStatic: number;
+  /** Das Netz wird per Ping geprüft und wurde schon einmal geprüft */
+  scanned: boolean;
+  online: number;
+  /** Vergeben, aber ohne Antwort beim letzten Ping */
+  noReply: number;
+  discovered: number;
+  conflicts: number;
+  /** Zum ersten Mal per Ping gesehen in den letzten Tagen */
+  recent: number;
+  /** Vergeben, letzte Antwort liegt lange zurück */
+  stale: number;
+  /** Dynamische Leases, die bald ablaufen */
+  expiring: number;
+  /** Vergeben (nicht nur entdeckt), aber ohne A-Eintrag */
+  noDns: number;
+  /** Mit A-Eintrag und Reverse-Zone, aber ohne PTR */
+  noPtr: number;
+}
+
+/** Ein Tageswert im Verlauf eines Netzes. */
+export interface IpamHistoryPoint {
+  /** Tag (JJJJ-MM-TT, Serverzeit) */
+  day: string;
+  total: number;
+  used: number;
+  /** Höchste Zahl gleichzeitig erreichbarer Adressen am Tag; null ohne Ping-Prüfung */
+  online: number | null;
+}
+
+/** Verlauf je Netz (Schlüssel = Netz-ID), älteste Tage zuerst. */
+export type IpamHistory = Record<number, IpamHistoryPoint[]>;
 
 export interface IpamUsage {
   /** false, wenn Technitium nicht verbunden oder nicht erreichbar ist */

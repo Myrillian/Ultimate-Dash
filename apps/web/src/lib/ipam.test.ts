@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { IpamCategory, IpamNetwork, IpamNetworkUsage, IpamRange } from '@ultimate-dash/shared';
+import {
+  ipamNetworkStats,
+  type IpamCategory,
+  type IpamNetwork,
+  type IpamNetworkUsage,
+  type IpamRange,
+} from '@ultimate-dash/shared';
 import { buildCells, firstFree } from './ipam';
 
 const network: IpamNetwork = {
@@ -23,7 +29,7 @@ const ranges: IpamRange[] = [
     label: null,
   },
 ];
-const usage: IpamNetworkUsage = {
+const base: Omit<IpamNetworkUsage, 'stats'> = {
   networkId: 1,
   hosts: 14,
   used: 3,
@@ -45,6 +51,9 @@ const usage: IpamNetworkUsage = {
       discovered: false,
       claims: [{ source: 'dns', mac: null, name: 'a', scope: null, hostId: null }],
       conflict: false,
+      firstSeen: null,
+      leaseExpires: null,
+      ptr: null,
     },
     {
       address: '10.0.0.3',
@@ -54,6 +63,9 @@ const usage: IpamNetworkUsage = {
       discovered: false,
       claims: [{ source: 'reservation', mac: 'AA', name: 'b', scope: 'LAN', hostId: null }],
       conflict: false,
+      firstSeen: null,
+      leaseExpires: null,
+      ptr: null,
     },
     {
       address: '10.0.0.4',
@@ -63,6 +75,9 @@ const usage: IpamNetworkUsage = {
       discovered: false,
       claims: [{ source: 'lease', mac: 'AA', name: 'c', scope: 'LAN', hostId: null }],
       conflict: true,
+      firstSeen: null,
+      leaseExpires: null,
+      ptr: null,
     },
   ],
   rangeUse: {},
@@ -72,6 +87,7 @@ const usage: IpamNetworkUsage = {
   online: 0,
   lastScanAt: null,
 };
+const usage: IpamNetworkUsage = { ...base, stats: ipamNetworkStats(network.cidr, base) };
 
 describe('buildCells', () => {
   const cells = buildCells(network, ranges, categories, usage);

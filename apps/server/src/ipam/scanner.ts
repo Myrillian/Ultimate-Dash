@@ -39,6 +39,8 @@ export class IpamScanner {
       hosts: IpamHostStore;
       ping: Pinger;
       onError?: (error: unknown) => void;
+      /** Nach jedem erfolgreichen Durchlauf, z. B. für den Tageswert im Verlauf */
+      afterRun?: () => Promise<void> | void;
     },
   ) {}
 
@@ -123,6 +125,11 @@ export class IpamScanner {
         this.options.hosts.record(results, at);
         this.options.repo.markScanned(network.id, at);
         checked += addresses.length;
+      }
+      try {
+        await this.options.afterRun?.();
+      } catch (error) {
+        this.options.onError?.(error);
       }
     } catch (error) {
       this.lastError = error instanceof Error ? error.message : String(error);

@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import type {
   IpamCategory,
   IpamData,
+  IpamHistory,
   IpamIpDetail,
   IpamNetwork,
   IpamReachability,
@@ -202,6 +203,26 @@ describe('IPAM-Belegung', () => {
     ).toBeGreaterThan(0);
     expect(u.conflicts).toBe(0);
     expect(u.pools.length).toBeGreaterThan(0);
+  });
+
+  it('liefert Kennzahlen je Netz samt Pool und PTR-Lücken', async () => {
+    const { network } = await setup();
+    await call('PUT', '/api/technitium/settings', { url: fake.url, token: fake.token });
+    const u = (await call('GET', '/api/ipam/usage')).json<IpamUsage>().networks[network.id]!;
+    const byIp = Object.fromEntries(u.addresses.map((a) => [a.address, a]));
+    expect(byIp['10.10.10.10']!.ptr).toBe(true);
+    expect(byIp['10.10.10.20']!.ptr).toBe(false);
+    expect(u.stats).toMatchObject({
+      total: 254,
+      used: u.addresses.length,
+      free: 254 - u.addresses.length,
+      byType: { reservation: 1, lease: 2 },
+      scanned: false,
+      noPtr: 1,
+    });
+    // Pool LAN: .1 – .254 ohne .1 – .99
+    expect(u.stats.pool).toMatchObject({ size: 155, used: 2 });
+    expect(u.stats.freeStatic).toBe(u.stats.free - u.stats.pool!.free);
   });
 
   it('erkennt zwei Geräte auf einer Adresse als Konflikt', async () => {
@@ -482,6 +503,24 @@ describe('Ping-Prüfung', () => {
     expect((await usageOf(network.id)).addresses.some((x) => x.address === '10.10.10.5')).toBe(
       false,
     );
+  });
+
+  it('hält nach jeder Prüfung einen Tageswert im Verlauf fest', async () => {
+    const { network } = await setup();
+    expect((await call('GET', '/api/ipam/history')).json()).toEqual({});
+    await connect();
+    alive = new Set(['10.10.10.20', '10.10.10.5']);
+    await ctx.scanner.run();
+    alive = new Set(['10.10.10.20']);
+    await ctx.scanner.run();
+    const history = (await call('GET', '/api/ipam/history?days=7')).json<IpamHistory>();
+    const points = history[network.id]!;
+    expect(points).toHaveLength(1);
+    // Online ist der Höchstwert des Tages, vergeben der letzte Stand
+    expect(points[0]).toMatchObject({ total: 254, online: 2 });
+    const u = await usageOf(network.id);
+    expect(points[0]!.used).toBe(u.stats.used);
+    expect((await call('GET', '/api/ipam/history?days=500')).statusCode).toBe(400);
   });
 
   it('überspringt Netze mit ausgeschalteter Prüfung', async () => {

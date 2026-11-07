@@ -194,3 +194,22 @@ export const ipamHosts = sqliteTable('ipam_hosts', {
   lastSeenAt: text('last_seen_at'),
   lastCheckedAt: text('last_checked_at').notNull(),
 });
+
+/** Tageswerte je Netz für den Verlauf der Belegung (ein Eintrag pro Netz und Tag). */
+export const ipamNetworkHistory = sqliteTable(
+  'ipam_network_history',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    networkId: integer('network_id')
+      .notNull()
+      .references(() => ipamNetworks.id, { onDelete: 'cascade' }),
+    /** Tag in Serverzeit, JJJJ-MM-TT */
+    day: text('day').notNull(),
+    total: integer('total').notNull(),
+    /** Letzter Stand des Tages */
+    used: integer('used').notNull(),
+    /** Höchstwert des Tages; null, wenn das Netz nicht per Ping geprüft wird */
+    online: integer('online'),
+  },
+  (table) => [uniqueIndex('ipam_network_history_day').on(table.networkId, table.day)],
+);

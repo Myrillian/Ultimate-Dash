@@ -10,3 +10,4 @@ export * from './dhcp.js';
 export * from './ipam.js';
 export * from './views.js';
 export * from './ipam-hints.js';
+export * from './ipam-stats.js';
