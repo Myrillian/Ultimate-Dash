@@ -97,13 +97,14 @@
   }
 </script>
 
-<Dialog {open} {onclose} title="DHCP-Server">
+<Dialog {open} {onclose} title="Technitium-Server">
   {#if editing === null}
     <div class="grid gap-3 text-sm">
       <p class="text-fg-muted">
-        Laufen DHCP-Scopes auf mehreren Technitium-Servern (z. B. zwei Knoten mit geteiltem
-        Bereich), trage die weiteren hier ein. Scopes, Leases und Reservierungen aller Server werden
-        dann zusammen angezeigt, Änderungen gehen an den Server, der den Scope bedient.
+        Hier trägst du weitere Technitium-Server (z. B. den zweiten Knoten) mit Adresse und Token
+        ein und kannst sie bearbeiten. Sie werden für DHCP genutzt. Scopes, Leases und
+        Reservierungen aller Server werden dann zusammen angezeigt, Änderungen gehen an den Server,
+        der den Scope bedient.
       </p>
       {#if loadError}
         <p class="rounded-lg bg-down/10 px-3 py-2 text-down" role="alert">{loadError}</p>
