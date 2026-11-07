@@ -18,7 +18,7 @@ export function isReachable(httpStatus: number): boolean {
   return httpStatus < 400 || httpStatus === 401 || httpStatus === 403;
 }
 
-function describeError(error: unknown): string {
+export function describeError(error: unknown): string {
   if (error instanceof Error) {
     if (error.name === 'TimeoutError' || error.name === 'AbortError') return 'Zeitüberschreitung';
     const cause = (error as Error & { cause?: { code?: string; message?: string } }).cause;
