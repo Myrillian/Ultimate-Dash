@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { roleLabels } from '@ultimate-dash/shared';
   import { auth } from '$lib/auth.svelte';
+  import EmailDialog from './EmailDialog.svelte';
   import PasswordDialog from './PasswordDialog.svelte';
   import UiIcon from './UiIcon.svelte';
   import UsersDialog from './UsersDialog.svelte';
@@ -10,11 +12,12 @@
 
   let open = $state(false);
   let passwordOpen = $state(false);
+  let emailOpen = $state(false);
   let usersOpen = $state(false);
   let root: HTMLDivElement | undefined = $state();
   let trigger: HTMLButtonElement | undefined = $state();
 
-  const roleLabel = $derived(auth.user?.role === 'admin' ? 'Administrator' : 'Nur lesen');
+  const roleLabel = $derived(auth.user ? roleLabels[auth.user.role] : '');
 
   function close(returnFocus = false) {
     open = false;
@@ -75,6 +78,15 @@
               <UiIcon name="key" size={16} /> Passwort ändern
             </button>
           </li>
+          <li>
+            <button
+              type="button"
+              class="menu-item"
+              onclick={() => choose(() => (emailOpen = true))}
+            >
+              <UiIcon name="mail" size={16} /> E-Mail-Adresse
+            </button>
+          </li>
         {/if}
         {#if auth.isAdmin}
           <li>
@@ -130,6 +142,7 @@
 </div>
 
 <PasswordDialog open={passwordOpen} onclose={() => (passwordOpen = false)} />
+<EmailDialog open={emailOpen} onclose={() => (emailOpen = false)} />
 <ImportDialog open={menus.importOpen} onclose={() => (menus.importOpen = false)} />
 <CopyDialog open={menus.copyOpen} onclose={() => (menus.copyOpen = false)} />
 {#if auth.isAdmin}

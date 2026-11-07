@@ -1,7 +1,9 @@
 import { buildApp } from './app.js';
+import { runCli } from './cli.js';
 import { loadConfig } from './config.js';
 
 const config = loadConfig();
+if (process.argv.length > 2) process.exit(runCli(process.argv.slice(2), config));
 const { app } = await buildApp(config);
 
 const shutdown = async (signal: string) => {

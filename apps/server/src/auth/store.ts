@@ -1,12 +1,17 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { and, count, eq, lt, ne } from 'drizzle-orm';
+import { and, count, eq, lt, ne, or } from 'drizzle-orm';
 import type { Role, User } from '@ultimate-dash/shared';
 import type { Db } from '../db/client.js';
 import { NotFoundError, ValidationError } from '../db/repository.js';
-import { sessions, users } from '../db/schema.js';
+import { passwordResets, sessions, users } from '../db/schema.js';
 
 export const SESSION_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+
+/** Gültigkeit von Reset-Links: per Mail kurz, vom Admin oder per Kommandozeile länger. */
+export const RESET_TTL_MS = { mail: HOUR_MS, admin: 24 * HOUR_MS, cli: 24 * HOUR_MS } as const;
+export type ResetSource = keyof typeof RESET_TTL_MS;
 
 type UserRow = typeof users.$inferSelect;
 
@@ -18,6 +23,8 @@ export const toUser = (row: UserRow): User => ({
   lastLoginAt: row.lastLoginAt,
   hasPassword: row.passwordHash !== null,
   oidc: row.oidcSubject !== null,
+  email: row.email,
+  resetRequestedAt: row.resetRequestedAt,
 });
 
 const hashToken = (token: string) => createHash('sha256').update(token).digest('base64url');
@@ -31,6 +38,15 @@ export function createAuthStore(db: Db) {
 
     findByUsername(username: string): UserRow | undefined {
       return db.select().from(users).where(eq(users.username, username)).get();
+    },
+
+    /** Sucht für „Passwort vergessen“ nach Benutzername oder E-Mail-Adresse. */
+    findByLogin(login: string): UserRow | undefined {
+      return db
+        .select()
+        .from(users)
+        .where(or(eq(users.username, login), eq(users.email, login)))
+        .get();
     },
 
     findByOidcSubject(subject: string): UserRow | undefined {
@@ -58,10 +74,24 @@ export function createAuthStore(db: Db) {
       return db.select().from(users).orderBy(users.username).all().map(toUser);
     },
 
-    createUser(username: string, passwordHash: string, role: Role): User {
+    createUser(
+      username: string,
+      passwordHash: string,
+      role: Role,
+      email: string | null = null,
+    ): User {
       if (this.findByUsername(username))
         throw new ValidationError('Benutzername ist bereits vergeben');
-      return toUser(db.insert(users).values({ username, passwordHash, role }).returning().get());
+      if (email) this.assertEmailFree(email);
+      return toUser(
+        db.insert(users).values({ username, passwordHash, role, email }).returning().get(),
+      );
+    },
+
+    assertEmailFree(email: string, exceptId?: number): void {
+      const other = db.select({ id: users.id }).from(users).where(eq(users.email, email)).get();
+      if (other && other.id !== exceptId)
+        throw new ValidationError('Diese E-Mail-Adresse gehört schon zu einem anderen Benutzer');
     },
 
     /** Legt den ersten Admin an; schlägt fehl, wenn schon jemand existiert (atomar). */
@@ -77,11 +107,23 @@ export function createAuthStore(db: Db) {
 
     updateUser(
       id: number,
-      changes: { role?: Role; passwordHash?: string | null; oidcSubject?: string | null },
+      changes: {
+        role?: Role;
+        passwordHash?: string | null;
+        oidcSubject?: string | null;
+        email?: string | null;
+        resetRequestedAt?: string | null;
+      },
     ): User {
       const current = this.getUser(id);
       if (changes.role && changes.role !== 'admin' && current.role === 'admin')
         this.assertOtherAdmin(id);
+      if (changes.email) this.assertEmailFree(changes.email, id);
+      // Ein neues Passwort erledigt eine offene Anfrage und macht alte Reset-Links ungültig.
+      if (changes.passwordHash !== undefined) {
+        changes = { ...changes, resetRequestedAt: null };
+        db.delete(passwordResets).where(eq(passwordResets.userId, id)).run();
+      }
       const row = db.update(users).set(changes).where(eq(users.id, id)).returning().get();
       return toUser(row!);
     },
@@ -157,7 +199,50 @@ export function createAuthStore(db: Db) {
     },
 
     purgeExpiredSessions(): void {
-      db.delete(sessions).where(lt(sessions.expiresAt, new Date().toISOString())).run();
+      const now = new Date().toISOString();
+      db.delete(sessions).where(lt(sessions.expiresAt, now)).run();
+      db.delete(passwordResets).where(lt(passwordResets.expiresAt, now)).run();
+    },
+
+    /**
+     * Erzeugt einen Einmal-Link zum Zurücksetzen des Passworts. Ältere Links desselben
+     * Benutzers werden dabei ungültig, damit immer nur der neueste funktioniert.
+     */
+    createPasswordReset(userId: number, source: ResetSource): { token: string; expiresAt: string } {
+      const token = randomBytes(32).toString('base64url');
+      const expiresAt = new Date(Date.now() + RESET_TTL_MS[source]).toISOString();
+      db.transaction((tx) => {
+        tx.delete(passwordResets).where(eq(passwordResets.userId, userId)).run();
+        tx.insert(passwordResets)
+          .values({ id: hashToken(token), userId, expiresAt, source })
+          .run();
+      });
+      return { token, expiresAt };
+    },
+
+    /** Liefert den Benutzer zu einem noch gültigen Reset-Token, sonst null. */
+    resolvePasswordReset(token: string): UserRow | null {
+      const row = db
+        .select({ reset: passwordResets, user: users })
+        .from(passwordResets)
+        .innerJoin(users, eq(users.id, passwordResets.userId))
+        .where(eq(passwordResets.id, hashToken(token)))
+        .get();
+      if (!row) return null;
+      if (Date.parse(row.reset.expiresAt) <= Date.now()) {
+        db.delete(passwordResets)
+          .where(eq(passwordResets.id, hashToken(token)))
+          .run();
+        return null;
+      }
+      return row.user;
+    },
+
+    markResetRequested(userId: number): void {
+      db.update(users)
+        .set({ resetRequestedAt: new Date().toISOString() })
+        .where(eq(users.id, userId))
+        .run();
     },
   };
 }
