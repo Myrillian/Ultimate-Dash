@@ -81,3 +81,32 @@ export function formatLeaseTime(value: string | null): string {
   const time = /^\d{4}-\d{2}-\d{2}T/.test(value) ? Date.parse(value) : NaN;
   return Number.isNaN(time) ? value : leaseTime.format(new Date(time));
 }
+
+const UNITS = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
+const decimal = (value: number) =>
+  new Intl.NumberFormat('de-DE', { maximumFractionDigits: value < 10 ? 1 : 0 }).format(value);
+
+/** Bytes in Binäreinheiten wie in Proxmox: 44040192 → „42 MiB“, 1,5 GiB → „1,5 GiB“. */
+export function formatBytes(bytes: number): string {
+  let value = Math.max(0, bytes);
+  let unit = 0;
+  while (value >= 1024 && unit < UNITS.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${decimal(value)} ${UNITS[unit]}`;
+}
+
+/** Durchsatz: „1,2 MiB/s“. */
+export function formatRate(bytesPerSecond: number): string {
+  return `${formatBytes(bytesPerSecond)}/s`;
+}
+
+/** Laufzeit in Sekunden: „12 Tage“, „5 Std.“, „3 Min.“ */
+export function formatUptime(seconds: number): string {
+  const days = Math.floor(seconds / 86_400);
+  if (days >= 1) return `${days} ${days === 1 ? 'Tag' : 'Tage'}`;
+  const hours = Math.floor(seconds / 3600);
+  if (hours >= 1) return `${hours} Std.`;
+  return `${Math.max(1, Math.floor(seconds / 60))} Min.`;
+}

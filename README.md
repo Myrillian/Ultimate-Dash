@@ -20,6 +20,7 @@ Ein selbst gehostetes Dashboard für Homelab und Services: Startseite, Service-�
 | [IPAM & Technitium](docs/02-ipam-technitium.md)   | Was die Technitium-API kann, was fehlt, Gerätegruppen, Wizard „Neue IP“               |
 | [Architektur](docs/03-architektur.md)             | Frontend, Backend, Phasen, Risiken, Limitierungen                                     |
 | [Entscheidungen](docs/04-entscheidungen.md)       | Getroffene Grundsatzentscheidungen                                                    |
+| [Proxmox](docs/07-proxmox.md)                     | Anbindung, Kennzahlen, Anzeige und Token-Sicherheit                                   |
 
 ## Stack
 
@@ -69,6 +70,9 @@ pnpm format       # Formatierung
 | `LOG_REQUESTS`            | `false`  | Jede HTTP-Anfrage loggen               |
 | `TECHNITIUM_URL`          | –        | Feste Technitium-Adresse (siehe unten) |
 | `TECHNITIUM_TOKEN`        | –        | API-Token dazu                         |
+| `PROXMOX_URL`             | –        | Feste Proxmox-Adresse (siehe unten)    |
+| `PROXMOX_TOKEN_ID`        | –        | Token-ID dazu                          |
+| `PROXMOX_TOKEN_SECRET`    | –        | Secret des Tokens                      |
 
 ## Anmeldung und Benutzer
 
@@ -204,6 +208,20 @@ Unter `/dhcp` (Link „DHCP ›“ im DNS-Bereich) zeigt Ultimate Dash alle Scop
 Technitium kennt kein „Reservierung ändern“. Ultimate Dash entfernt dafür die alte und legt die neue an. Schlägt das Anlegen fehl (zum Beispiel, weil die IP schon vergeben ist), wird die alte Reservierung wiederhergestellt. Scopes selbst lassen sich hier noch nicht anlegen oder bearbeiten, das geht weiter in Technitium. Das API-Token braucht die Rechte _DhcpServer: View_, _Modify_ und _Delete_. Alle Änderungen stehen im Änderungsprotokoll.
 
 Zum Ausprobieren ohne echten Server gibt es eine Simulation: `pnpm --filter @ultimate-dash/server fake:technitium` startet sie auf Port 5380 mit dem Token `dev-token`.
+
+## Proxmox VE
+
+Ist Proxmox verbunden, sehen Admins unter dem DNS-Bereich die Kernwerte des Hosts: CPU, RAM, Netzwerk- und Storage-Durchsatz, belegten Platz der Datastores sowie laufende VMs und Container. Als Balken zeigt das Überfahren von „VMs“ oder „CTs“ die gestoppten Gäste mit Namen; die kompakte Ansicht zeigt Kacheln mit Verlauf und alle Datastores. Benutzer ohne Admin-Rolle sehen den Bereich nicht. Der Zugriff ist rein lesend.
+
+**Einrichten:** Einstellungen › _Verbindungen › Proxmox VE_, Adresse (z. B. `https://pve.home.lan:8006`), Token-ID und Secret eintragen. Ein passendes Token legst du in der Proxmox-Shell an:
+
+```sh
+pveum user add dashboard@pve
+pveum user token add dashboard@pve ultimate-dash --privsep 1
+pveum acl modify / --tokens 'dashboard@pve!ultimate-dash' --roles PVEAuditor
+```
+
+Fest vorgeben lässt sich die Verbindung mit `PROXMOX_URL`, `PROXMOX_TOKEN_ID` und `PROXMOX_TOKEN_SECRET` (optional `PROXMOX_TLS_INSECURE=true`). Details: `docs/07-proxmox.md`.
 
 ## IPAM
 

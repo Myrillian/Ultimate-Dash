@@ -3,6 +3,8 @@
 const LABELS: Record<string, string> = {
   'technitium.connect': 'Technitium verbunden',
   'technitium.disconnect': 'Technitium getrennt',
+  'proxmox.connect': 'Proxmox verbunden',
+  'proxmox.disconnect': 'Proxmox getrennt',
   'technitium.blocking.enable': 'Werbeblocker eingeschaltet',
   'technitium.blocking.disable': 'Werbeblocker ausgeschaltet',
   'technitium.blocking.pause': 'Werbeblocker pausiert',

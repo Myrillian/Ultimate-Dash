@@ -4,6 +4,8 @@ import { loadMailConfig, type MailConfig } from './auth/mailer.js';
 import { loadOidcConfig, type OidcConfig } from './auth/oidc.js';
 import type { TechnitiumConnection } from './technitium/client.js';
 import { connectionFromEnv } from './technitium/service.js';
+import type { ProxmoxConnection } from './proxmox/client.js';
+import { proxmoxFromEnv } from './proxmox/service.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
@@ -36,6 +38,8 @@ export interface AppConfig {
    * einstellbar. Fehlt das Feld (Tests), werden die Umgebungsvariablen gelesen.
    */
   technitium?: TechnitiumConnection | null;
+  /** Feste Proxmox-Verbindung aus PROXMOX_URL/PROXMOX_TOKEN_ID/PROXMOX_TOKEN_SECRET, sonst wie oben. */
+  proxmox?: ProxmoxConnection | null;
 }
 
 export function loadConfig(): AppConfig {
@@ -55,5 +59,6 @@ export function loadConfig(): AppConfig {
     oidc: loadOidcConfig(),
     mail: loadMailConfig(),
     technitium: connectionFromEnv(),
+    proxmox: proxmoxFromEnv(),
   };
 }

@@ -18,6 +18,10 @@ services:
       # Optional: Technitium fest vorgeben, statt es in der Oberfläche einzurichten
       # TECHNITIUM_URL: http://10.10.0.53:5380
       # TECHNITIUM_TOKEN: ${TECHNITIUM_TOKEN}
+      # Optional: Proxmox fest vorgeben (Token mit Rolle PVEAuditor)
+      # PROXMOX_URL: https://pve.home.lan:8006
+      # PROXMOX_TOKEN_ID: dashboard@pve!ultimate-dash
+      # PROXMOX_TOKEN_SECRET: ${PROXMOX_TOKEN_SECRET}
       # Optional: „Passwort vergessen“ per E-Mail (siehe README)
       # SMTP_HOST: mail.example.org
       # SMTP_USER: dash@example.org

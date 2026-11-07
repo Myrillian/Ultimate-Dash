@@ -8,6 +8,7 @@
     ServiceInput,
   } from '@ultimate-dash/shared';
   import { api, ApiError } from '$lib/api';
+  import { auth } from '$lib/auth.svelte';
   import { dashboard } from '$lib/dashboard.svelte';
   import { FLIP_MS, idsOf } from '$lib/dnd';
   import { dragHandleZone, type DndEvent } from 'svelte-dnd-action';
@@ -25,6 +26,7 @@
   import UserMenu from '$lib/components/UserMenu.svelte';
   import NetMenu from '$lib/components/NetMenu.svelte';
   import DnsPanel from '$lib/components/DnsPanel.svelte';
+  import ProxmoxPanel from '$lib/components/ProxmoxPanel.svelte';
   import FeedPanel from '$lib/components/FeedPanel.svelte';
   import { news } from '$lib/feeds.svelte';
   import { menus } from '$lib/menus.svelte';
@@ -249,6 +251,9 @@
     <main class="grid min-w-0 flex-1 content-start gap-6 sm:gap-8">
       {#if dashboard.data && !searching}
         <DnsPanel onconnect={() => (menus.technitiumOpen = true)} />
+        {#if auth.isAdmin}
+          <ProxmoxPanel onconnect={() => (menus.proxmoxOpen = true)} />
+        {/if}
       {/if}
       {#if dashboard.error && !dashboard.data}
         <div
