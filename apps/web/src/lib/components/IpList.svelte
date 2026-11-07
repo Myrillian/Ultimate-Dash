@@ -2,6 +2,8 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import {
+    ipamAddressFlags,
+    ipamFlagLabels,
     ipamHintLabels,
     ipamHintsFromClaims,
     ipv4ToInt,
@@ -49,7 +51,20 @@
     manual: 'Von Hand',
   } as const;
   const statusLabel = { online: 'Online', offline: 'Offline', unchecked: 'Nicht geprüft' } as const;
-  const flagLabel = { discovered: 'Entdeckt', conflict: 'Konflikt' } as const;
+  const flagLabel: Record<string, string> = {
+    discovered: 'Entdeckt',
+    conflict: 'Konflikt',
+    ...ipamFlagLabels,
+  };
+  const FLAGS = [
+    'discovered',
+    'conflict',
+    'recent',
+    'stale',
+    'expiring',
+    'no-dns',
+    'no-ptr',
+  ] as const;
 
   const COLUMNS = [
     ['name', 'Name'],
@@ -166,9 +181,15 @@
       const sources = [...new Set(row.claims.map((c) => sourceLabel[c.source]))];
       const scopes = [...new Set(row.claims.map((c) => c.scope).filter((s): s is string => !!s))];
       const hints = ipamHintsFromClaims(row.claims);
+      const flags: string[] = [
+        ...(row.discovered ? ['discovered'] : []),
+        ...(row.conflict ? ['conflict'] : []),
+        ...ipamAddressFlags(row),
+      ];
       return {
         row,
         hints,
+        flags,
         names,
         macs,
         vendorNames,
@@ -223,10 +244,7 @@
       if (!matchesAll(e.haystack, tokens)) return false;
       if (typeSel.length > 0 && !typeSel.includes(e.row.type)) return false;
       if (statusSel.length > 0 && !statusSel.includes(e.status)) return false;
-      if (flagSel.length > 0) {
-        const flags = [e.row.discovered ? 'discovered' : '', e.row.conflict ? 'conflict' : ''];
-        if (!flagSel.some((f) => flags.includes(f))) return false;
-      }
+      if (flagSel.length > 0 && !flagSel.some((f) => e.flags.includes(f))) return false;
       if (hintSel.length > 0 && !hintSel.some((h) => e.hints.includes(h as IpamHintKind)))
         return false;
       if (catSel.length > 0 && !catSel.includes(e.category ? String(e.category.id) : 'none'))
@@ -273,11 +291,18 @@
       key: 'flag',
       label: 'Merkmal',
       selected: flagSel,
-      options: (['discovered', 'conflict'] as const).map((value) => ({
+      // Die neueren Merkmale ohne Treffer nur zeigen, wenn sie gewählt sind (z. B. aus der Statistik)
+      options: FLAGS.map((value) => ({
         value,
-        label: flagLabel[value],
-        count: count((e) => (value === 'discovered' ? e.row.discovered : e.row.conflict)),
-      })),
+        label: flagLabel[value]!,
+        count: count((e) => e.flags.includes(value)),
+      })).filter(
+        (o) =>
+          o.value === 'discovered' ||
+          o.value === 'conflict' ||
+          o.count > 0 ||
+          flagSel.includes(o.value),
+      ),
     },
     {
       key: 'hint',

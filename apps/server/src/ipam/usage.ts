@@ -1,4 +1,5 @@
 import {
+  ipamNetworkStats,
   ipv4ToInt,
   parseCidr,
   type DhcpLease,
@@ -30,6 +31,10 @@ interface Snapshot {
   claims: Map<number, IpamClaim[]>;
   /** A-Einträge je Adresse */
   forward: Map<number, { zone: string; domain: string; ttl: number; comment: string | null }[]>;
+  /** Aktive Reverse-Zonen (Namen in Kleinbuchstaben), deren Einträge geladen werden konnten */
+  reverseZones: string[];
+  /** Adressen mit PTR-Eintrag */
+  ptr: Set<number>;
 }
 
 const CACHE_MS = 15_000;
@@ -156,7 +161,31 @@ export class IpamUsageService {
             ]);
         }
 
-    return { scopes, leases, zones, claims, forward };
+    // PTR-Einträge für die Statistik „ohne PTR“; eine fehlerhafte Zone zählt als unbekannt.
+    const reverse = await Promise.all(
+      zones
+        .filter(
+          (z) =>
+            !z.internal &&
+            !z.disabled &&
+            z.name.toLowerCase().endsWith('.in-addr.arpa') &&
+            /^(Primary|Secondary)$/i.test(z.type),
+        )
+        .map((zone) => this.sources.records(zone.name).catch(() => null)),
+    );
+    const reverseZones: string[] = [];
+    const ptr = new Set<number>();
+    for (const list of reverse) {
+      if (!list) continue;
+      reverseZones.push(list.zone.name.toLowerCase());
+      for (const record of list.records) {
+        if (record.type !== 'PTR' || record.disabled) continue;
+        const ip = ptrAddress(record.domain);
+        if (ip !== null) ptr.add(ip);
+      }
+    }
+
+    return { scopes, leases, zones, claims, forward, reverseZones, ptr };
   }
 
   /**
@@ -304,6 +333,17 @@ export class IpamUsageService {
     }
 
     const hostRows = new Map(this.hosts().map((h) => [ipv4ToInt(h.address)!, h]));
+    // Ablauf dynamischer Leases je Adresse (späteste, falls mehrere Server sie kennen)
+    const dynamicLeases = new Map<number, string>();
+    for (const lease of snapshot.leases) {
+      const ip = ipv4ToInt(lease.address);
+      if (ip === null || lease.type !== 'Dynamic' || !lease.expires) continue;
+      const iso = new Date(lease.expires);
+      if (Number.isNaN(iso.getTime())) continue;
+      const known = dynamicLeases.get(ip);
+      if (!known || Date.parse(known) < iso.getTime()) dynamicLeases.set(ip, iso.toISOString());
+    }
+    const now = Date.now();
     const networks: Record<number, IpamNetworkUsage> = {};
     for (const network of data.networks) {
       const cidr = parseCidr(network.cidr)!;
@@ -352,8 +392,11 @@ export class IpamUsageService {
         const alive = host ? host.alive : scanned ? false : null;
         if (alive) online++;
         if (isDiscovered) discovered++;
+        const address = intToString(ip);
+        const ptrName = `${address.split('.').reverse().join('.')}.in-addr.arpa`;
+        const covered = snapshot.reverseZones.some((z) => ptrName.endsWith(`.${z}`));
         addresses.push({
-          address: intToString(ip),
+          address,
           claims,
           type: claims.some((c) => c.source === 'reservation')
             ? 'reservation'
@@ -364,6 +407,9 @@ export class IpamUsageService {
           alive,
           lastSeen: host?.lastSeenAt ?? null,
           discovered: isDiscovered,
+          firstSeen: host?.firstSeenAt ?? null,
+          leaseExpires: dynamicLeases.get(ip) ?? null,
+          ptr: covered ? snapshot.ptr.has(ip) : null,
         });
         const range = ranges.find((r) => ip >= r.s && ip <= r.e);
         if (range) rangeUse[range.id]!.used++;
@@ -371,37 +417,52 @@ export class IpamUsageService {
       }
       addresses.sort((a, b) => ipv4ToInt(a.address)! - ipv4ToInt(b.address)!);
 
+      const pools = snapshot.scopes
+        .filter((s) => {
+          const a = ipv4ToInt(s.startingAddress);
+          const b = ipv4ToInt(s.endingAddress);
+          return a !== null && b !== null && a <= cidr.last && b >= cidr.first;
+        })
+        .map((s) => ({
+          scope: s.name,
+          enabled: s.enabled,
+          start: s.startingAddress,
+          end: s.endingAddress,
+          exclusions: s.exclusions.map((x) => ({
+            start: x.startingAddress,
+            end: x.endingAddress,
+          })),
+        }));
+      const lastScanAt = network.scan ? network.lastScanAt : null;
       networks[network.id] = {
         networkId: network.id,
         hosts: cidr.size - 2,
         used: addresses.length,
-        pools: snapshot.scopes
-          .filter((s) => {
-            const a = ipv4ToInt(s.startingAddress);
-            const b = ipv4ToInt(s.endingAddress);
-            return a !== null && b !== null && a <= cidr.last && b >= cidr.first;
-          })
-          .map((s) => ({
-            scope: s.name,
-            enabled: s.enabled,
-            start: s.startingAddress,
-            end: s.endingAddress,
-            exclusions: s.exclusions.map((x) => ({
-              start: x.startingAddress,
-              end: x.endingAddress,
-            })),
-          })),
+        pools,
         addresses,
         rangeUse,
         unassignedUsed,
         conflicts,
         discovered,
         online,
-        lastScanAt: network.scan ? network.lastScanAt : null,
+        lastScanAt,
+        stats: ipamNetworkStats(
+          network.cidr,
+          { hosts: cidr.size - 2, addresses, pools, lastScanAt },
+          now,
+        ),
       };
     }
     return { available: true, reason: null, networks };
   }
+}
+
+/** „5.10.10.10.in-addr.arpa“ → Adresse als Zahl; null, wenn es keine vollständige IPv4-Adresse ist. */
+function ptrAddress(domain: string): number | null {
+  const name = domain.toLowerCase().replace(/\.$/, '');
+  if (!name.endsWith('.in-addr.arpa')) return null;
+  const parts = name.slice(0, -'.in-addr.arpa'.length).split('.');
+  return parts.length === 4 ? ipv4ToInt(parts.reverse().join('.')) : null;
 }
 
 function intToString(value: number): string {

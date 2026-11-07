@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { IpamReachability } from '@ultimate-dash/shared';
+import { HISTORY_KEEP_DAYS, type IpamHistoryStore } from '../ipam/history.js';
 import type { IpamHostStore } from '../ipam/hosts.js';
 import type { IpamScanner } from '../ipam/scanner.js';
 import type { IpamRepository } from '../ipam/repository.js';
@@ -20,12 +21,14 @@ export async function ipamRoutes(
     sync,
     scanner,
     hosts,
+    history,
   }: {
     repo: IpamRepository;
     usage: IpamUsageService;
     sync: IpamSyncService;
     scanner: IpamScanner;
     hosts: IpamHostStore;
+    history: IpamHistoryStore;
   },
 ) {
   app.get('/ipam', async (_request, reply) => {
@@ -37,6 +40,15 @@ export async function ipamRoutes(
   app.get('/ipam/usage', async (_request, reply) => {
     reply.header('cache-control', 'no-store');
     return usage.usage(repo.all());
+  });
+
+  // Tageswerte der Belegung je Netz für den Verlauf (Lesen).
+  app.get('/ipam/history', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const { days } = z
+      .object({ days: z.coerce.number().int().min(1).max(HISTORY_KEEP_DAYS).default(30) })
+      .parse(request.query);
+    return history.series(days);
   });
 
   // Hersteller zu MAC-Kennungen (erste drei Byte); Lesen, aus der mitgelieferten IEEE-Liste.

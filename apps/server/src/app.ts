@@ -20,6 +20,7 @@ import { apiRoutes } from './routes/api.js';
 import { configRoutes } from './routes/config.js';
 import { iconRoutes } from './routes/icons.js';
 import { IpamRepository } from './ipam/repository.js';
+import { IpamHistoryStore } from './ipam/history.js';
 import { IpamHostStore } from './ipam/hosts.js';
 import { systemPing, type Pinger } from './ipam/ping.js';
 import { IpamScanner } from './ipam/scanner.js';
@@ -151,6 +152,9 @@ export async function buildApp(
     )
       ipamUsage.invalidate();
   });
+  const ipamHistory = new IpamHistoryStore(db);
+  /** Tageswert für den Verlauf; ohne Technitium bleibt der Tag leer. */
+  const recordHistory = async () => ipamHistory.record(await ipamUsage.usage(ipam.all()));
   const scanner = new IpamScanner({
     db,
     audit,
@@ -158,6 +162,7 @@ export async function buildApp(
     hosts: ipamHosts,
     ping: options.pinger ?? systemPing,
     onError: (error) => app.log.warn({ err: error }, 'Ping-Prüfung fehlgeschlagen'),
+    afterRun: recordHistory,
   });
   const feeds = new FeedService({
     db,
@@ -177,6 +182,7 @@ export async function buildApp(
     sync: ipamSync,
     scanner,
     hosts: ipamHosts,
+    history: ipamHistory,
   });
 
   if (config.webRoot && existsSync(config.webRoot)) {
@@ -207,14 +213,27 @@ export async function buildApp(
 
   const purge = setInterval(() => authStore.purgeExpiredSessions(), 6 * 60 * 60 * 1000);
   purge.unref();
+  // Auch ohne Ping-Prüfung stündlich einen Stand für den Verlauf festhalten.
+  let historyTimer: NodeJS.Timeout | undefined;
   app.addHook('onReady', async () => {
     authStore.purgeExpiredSessions();
     if (options.startMonitor !== false) monitor.start();
-    if (options.startScanner !== false && options.startMonitor !== false) scanner.start();
+    if (options.startScanner !== false && options.startMonitor !== false) {
+      scanner.start();
+      historyTimer = setInterval(
+        () =>
+          void recordHistory().catch((error) =>
+            app.log.warn({ err: error }, 'Verlauf konnte nicht gespeichert werden'),
+          ),
+        60 * 60 * 1000,
+      );
+      historyTimer.unref();
+    }
     if (options.startFeeds !== false && options.startMonitor !== false) feeds.start();
   });
   app.addHook('onClose', async () => {
     clearInterval(purge);
+    clearInterval(historyTimer);
     monitor.stop();
     scanner.stop();
     feeds.stop();

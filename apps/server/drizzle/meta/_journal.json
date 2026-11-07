@@ -71,6 +71,13 @@
       "when": 1794046519836,
       "tag": "0009_rss_feeds",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1794050082995,
+      "tag": "0010_ipam_verlauf",
+      "breakpoints": true
     }
   ]
 }
