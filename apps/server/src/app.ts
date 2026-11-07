@@ -27,6 +27,8 @@ import { IpamSyncService } from './ipam/sync.js';
 import { IpamUsageService } from './ipam/usage.js';
 import { ipamRoutes } from './routes/ipam.js';
 import { viewRoutes } from './routes/views.js';
+import { feedRoutes } from './routes/feeds.js';
+import { FeedService } from './feeds/service.js';
 import { technitiumRoutes } from './routes/technitium.js';
 import { TechnitiumError } from './technitium/client.js';
 import { DhcpService } from './technitium/dhcp.js';
@@ -44,6 +46,9 @@ export async function buildApp(
     startScanner?: boolean;
     /** Mailversand (Tests ersetzen ihn); sonst aus config.mail */
     mailer?: Mailer;
+    /** Abruf der RSS-Feeds (Tests ersetzen ihn) und ob der Zeitplan startet */
+    feedFetch?: typeof fetch;
+    startFeeds?: boolean;
   } = {},
 ) {
   const app = Fastify({
@@ -154,6 +159,16 @@ export async function buildApp(
     ping: options.pinger ?? systemPing,
     onError: (error) => app.log.warn({ err: error }, 'Ping-Prüfung fehlgeschlagen'),
   });
+  const feeds = new FeedService({
+    db,
+    audit,
+    events,
+    intervalMs: config.feedIntervalMinutes * 60_000,
+    fetchImpl: options.feedFetch,
+    onError: (error) => app.log.warn({ err: error }, 'Feed-Abruf fehlgeschlagen'),
+  });
+  feeds.seedDefaults();
+  await app.register(feedRoutes, { prefix: '/api', feeds });
   const ipamSync = new IpamSyncService({ repo: ipam, audit, scopes: () => dhcp.scopes() });
   await app.register(ipamRoutes, {
     prefix: '/api',
@@ -196,13 +211,15 @@ export async function buildApp(
     authStore.purgeExpiredSessions();
     if (options.startMonitor !== false) monitor.start();
     if (options.startScanner !== false && options.startMonitor !== false) scanner.start();
+    if (options.startFeeds !== false && options.startMonitor !== false) feeds.start();
   });
   app.addHook('onClose', async () => {
     clearInterval(purge);
     monitor.stop();
     scanner.stop();
+    feeds.stop();
     close();
   });
 
-  return { app, repo, authStore, monitor, events, technitium, audit, scanner };
+  return { app, repo, authStore, monitor, events, technitium, audit, scanner, feeds };
 }

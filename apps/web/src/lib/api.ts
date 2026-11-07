@@ -1,4 +1,9 @@
 import type {
+  Feed,
+  FeedInput,
+  FeedItemsPage,
+  FeedPreview,
+  FeedUpdate,
   SavedView,
   SavedViewInput,
   ViewScope,
@@ -180,6 +185,22 @@ export const api = {
   dhcpLeaseAction: (input: DhcpLeaseAction) =>
     request<void>('POST', '/technitium/dhcp/leases/action', input),
   audit: (limit = 500) => request<AuditEntry[]>('GET', `/audit?limit=${limit}`),
+
+  feedItems: (params: { topic?: string; before?: string; limit?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (params.topic) query.set('topic', params.topic);
+    if (params.before) query.set('before', params.before);
+    if (params.limit) query.set('limit', String(params.limit));
+    const suffix = query.size > 0 ? `?${query}` : '';
+    return request<FeedItemsPage>('GET', `/feeds/items${suffix}`);
+  },
+  feeds: () => request<Feed[]>('GET', '/feeds'),
+  previewFeed: (url: string) => request<FeedPreview>('POST', '/feeds/preview', { url }),
+  createFeed: (input: FeedInput) => request<Feed>('POST', '/feeds', input),
+  updateFeed: (id: number, input: FeedUpdate) => request<Feed>('PUT', `/feeds/${id}`, input),
+  deleteFeed: (id: number) => request<void>('DELETE', `/feeds/${id}`),
+  refreshFeed: (id: number) => request<Feed>('POST', `/feeds/${id}/refresh`),
+  restoreDefaultFeeds: () => request<{ added: number }>('POST', '/feeds/defaults'),
 
   views: (scope: ViewScope) => request<SavedView[]>('GET', `/views?scope=${scope}`),
   saveView: (input: SavedViewInput) => request<SavedView>('PUT', '/views', input),

@@ -63,6 +63,7 @@ pnpm format       # Formatierung
 | `PORT`                    | `3000`   | HTTP-Port                              |
 | `DATA_DIR`                | `./data` | Ordner für die SQLite-Datenbank        |
 | `STATUS_INTERVAL_SECONDS` | `60`     | Abstand der Statusprüfungen            |
+| `FEED_INTERVAL_MINUTES`   | `30`     | Abstand der Abrufe je RSS-Feed         |
 | `STATUS_TIMEOUT_MS`       | `5000`   | Zeitlimit pro Statusprüfung            |
 | `LOG_LEVEL`               | `info`   | `debug`, `info`, `warn`, `error`       |
 | `LOG_REQUESTS`            | `false`  | Jede HTTP-Anfrage loggen               |

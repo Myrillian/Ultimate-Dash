@@ -24,6 +24,8 @@ export interface AppConfig {
   webRoot: string | null;
   statusIntervalSeconds: number;
   statusTimeoutMs: number;
+  /** Abstand zwischen zwei Abrufen eines RSS-Feeds. */
+  feedIntervalMinutes: number;
   logLevel: string;
   /** null = Anmeldung nur lokal */
   oidc: OidcConfig | null;
@@ -48,6 +50,7 @@ export function loadConfig(): AppConfig {
     webRoot: process.env.WEB_ROOT ? resolve(process.env.WEB_ROOT) : null,
     statusIntervalSeconds: intFromEnv('STATUS_INTERVAL_SECONDS', 60),
     statusTimeoutMs: intFromEnv('STATUS_TIMEOUT_MS', 5000),
+    feedIntervalMinutes: intFromEnv('FEED_INTERVAL_MINUTES', 30),
     logLevel: process.env.LOG_LEVEL ?? 'info',
     oidc: loadOidcConfig(),
     mail: loadMailConfig(),
