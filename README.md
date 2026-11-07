@@ -74,12 +74,12 @@ pnpm format       # Formatierung
 
 Beim ersten Aufruf legst du im Browser ein Administrator-Konto an. Danach ist das Dashboard nur nach der Anmeldung erreichbar.
 
-- **Administrator**: darf alles bearbeiten und Benutzer verwalten (Benutzermenü oben rechts → _Benutzer verwalten_).
+- **Administrator**: darf alles bearbeiten und Benutzer verwalten (Einstellungen oben rechts → _Admin › Benutzer verwalten_).
 - **Benutzer**: darf das eigene Dashboard bearbeiten, in IPAM, DHCP und DNS aber nichts ändern.
 
 In der Benutzerverwaltung legen Admins Benutzer an, ändern ihre Rolle und E-Mail-Adresse, setzen ein neues Passwort oder erzeugen einen Reset-Link und löschen Benutzer. Der letzte Admin lässt sich weder löschen noch herabstufen.
 
-**Dashboard pro Benutzer:** Jeder hat sein eigenes Dashboard (Gruppen, Services, Reihenfolge, Titel). Neue Benutzer starten leer; das bisherige Dashboard gehört dem ersten Administrator. Über _Von anderem Benutzer kopieren_ (Benutzermenü oder Startseite) wählst du per Checkbox Gruppen und Services aus dem Dashboard eines anderen Benutzers; sie werden als unabhängige Kopie übernommen, Gruppen gleichen Namens ergänzt, gleichnamige Services übersprungen. Wer dieselbe Adresse mehrfach hat, wird nur einmal geprüft. IPAM, DNS und DHCP sind für alle gleich.
+**Dashboard pro Benutzer:** Jeder hat sein eigenes Dashboard (Gruppen, Services, Reihenfolge, Titel). Neue Benutzer starten leer; das bisherige Dashboard gehört dem ersten Administrator. Über _Von anderem Benutzer kopieren_ (Einstellungen › _Backup_ oder Startseite) wählst du per Checkbox Gruppen und Services aus dem Dashboard eines anderen Benutzers; sie werden als unabhängige Kopie übernommen, Gruppen gleichen Namens ergänzt, gleichnamige Services übersprungen. Wer dieselbe Adresse mehrfach hat, wird nur einmal geprüft. IPAM, DNS und DHCP sind für alle gleich.
 
 Passwörter werden mit scrypt gespeichert, Sitzungen laufen 30 Tage und verlängern sich bei Nutzung. Nach zehn Fehlversuchen in 15 Minuten wird die Anmeldung für diesen Benutzernamen und diese IP kurz gesperrt. Hinter einem Reverse-Proxy mit HTTPS wird das Cookie automatisch als `Secure` gesetzt, wenn der Proxy `X-Forwarded-Proto` mitsendet.
 
@@ -158,7 +158,7 @@ Ohne Icon zeigt das Dashboard farbige Initialen.
 
 ## Export und Import
 
-Im Benutzermenü lässt sich das eigene Dashboard als YAML herunterladen und wieder einlesen. Vor dem Import zeigt eine Vorschau, was angelegt, aktualisiert oder entfernt wird.
+Unter Einstellungen › _Backup_ lässt sich das eigene Dashboard als YAML herunterladen und wieder einlesen. Vor dem Import zeigt eine Vorschau, was angelegt, aktualisiert oder entfernt wird.
 
 - **Zusammenführen:** Gruppen und Services mit gleichem Namen werden aktualisiert, neue ergänzt, nichts gelöscht.
 - **Ersetzen:** alles Bestehende wird durch die Datei ersetzt.
@@ -185,7 +185,7 @@ Weitere Felder pro Service: `description`, `target` (`_blank` oder `_self`), `st
 
 Ist Technitium verbunden, zeigt das Dashboard oben einen DNS-Bereich: Anfragen, Geblockt, Cache-Anteil und Clients, den Verlauf (auch als Tabelle), woher die Antworten kamen, sowie Top-Domains, geblockte Domains und Top-Clients. Der Zeitraum (1 Stunde bis 1 Jahr) gilt für alles darin. Admins können das Blocking für 5, 15 oder 60 Minuten pausieren, dauerhaft aus- und wieder einschalten und die Blocklisten sofort aktualisieren. Jede dieser Änderungen landet mit Benutzer und Zeitpunkt im Änderungsprotokoll.
 
-**Einrichten:** Benutzermenü › _Technitium DNS_, Adresse der Weboberfläche (z. B. `http://10.10.0.53:5380`) und ein API-Token eintragen. Das Token erzeugst du in Technitium unter _Administration › Sessions › Create Token_, am besten für einen eigenen Benutzer. Für die Statistik genügt die Berechtigung _Dashboard: View_, für das Blocking zusätzlich _Settings: Modify_. Gespeichert wird nur, wenn die Verbindung klappt.
+**Einrichten:** Einstellungen › _Verbindungen › Technitium DNS_, Adresse der Weboberfläche (z. B. `http://10.10.0.53:5380`) und ein API-Token eintragen. Das Token erzeugst du in Technitium unter _Administration › Sessions › Create Token_, am besten für einen eigenen Benutzer. Für die Statistik genügt die Berechtigung _Dashboard: View_, für das Blocking zusätzlich _Settings: Modify_. Gespeichert wird nur, wenn die Verbindung klappt.
 
 Das Token bleibt auf dem Server (in der SQLite-Datei) und wird nie an den Browser geschickt. Alle Anfragen an Technitium laufen über das Backend. Wer die Verbindung lieber fest vorgibt, setzt `TECHNITIUM_URL` und `TECHNITIUM_TOKEN` (optional `TECHNITIUM_TLS_INSECURE=true` bei selbst signiertem Zertifikat); dann ist sie in der Oberfläche nur lesbar.
 

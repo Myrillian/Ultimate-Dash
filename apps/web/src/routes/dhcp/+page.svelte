@@ -20,6 +20,7 @@
   import ReservationForm, { type ReservationValues } from '$lib/components/ReservationForm.svelte';
   import TechNav from '$lib/components/TechNav.svelte';
   import UiIcon from '$lib/components/UiIcon.svelte';
+  import SettingsMenu from '$lib/components/SettingsMenu.svelte';
   import UserMenu from '$lib/components/UserMenu.svelte';
 
   type Reservation = DhcpReservation & { scope: string; server: string; serverName: string };
@@ -295,6 +296,7 @@
       >
         <UiIcon name={theme.current === 'dark' ? 'sun' : 'moon'} />
       </button>
+      <SettingsMenu />
       <UserMenu />
     </div>
   </header>
@@ -304,7 +306,7 @@
       <p class="font-medium">Technitium ist noch nicht verbunden.</p>
       <p class="mt-1 text-sm text-fg-muted">
         {auth.isAdmin
-          ? 'Richte die Verbindung im Benutzermenü unter „Technitium DNS“ ein.'
+          ? 'Richte die Verbindung in den Einstellungen unter „Verbindungen › Technitium DNS“ ein.'
           : 'Ein Administrator kann die Verbindung einrichten.'}
       </p>
     </div>

@@ -12,7 +12,7 @@ Das Dashboard zeigt Meldungen aus RSS- und Atom-Feeds. Entscheidung und Gründe:
 
 ## Verwaltung (Admins)
 
-Benutzermenü → „Feeds verwalten“ oder Zahnrad in der Leiste: Feed per Adresse prüfen und hinzufügen, Name, Thema und Adresse ändern, aktivieren/deaktivieren, sofort abrufen, entfernen. „Standardfeeds wiederherstellen“ legt gelöschte Standardfeeds wieder an. Änderungen stehen im Protokoll (`feeds.*`).
+Einstellungen → „Verbindungen › Feeds verwalten“ oder Zahnrad in der Leiste: Feed per Adresse prüfen und hinzufügen, Name, Thema und Adresse ändern, aktivieren/deaktivieren, sofort abrufen, entfernen. „Standardfeeds wiederherstellen“ legt gelöschte Standardfeeds wieder an. Änderungen stehen im Protokoll (`feeds.*`).
 
 ## Server
 

@@ -21,6 +21,7 @@
   import ServiceCard from '$lib/components/ServiceCard.svelte';
   import ServiceForm from '$lib/components/ServiceForm.svelte';
   import UiIcon from '$lib/components/UiIcon.svelte';
+  import SettingsMenu from '$lib/components/SettingsMenu.svelte';
   import UserMenu from '$lib/components/UserMenu.svelte';
   import NetMenu from '$lib/components/NetMenu.svelte';
   import DnsPanel from '$lib/components/DnsPanel.svelte';
@@ -228,6 +229,7 @@
       >
         <UiIcon name={theme.current === 'dark' ? 'sun' : 'moon'} />
       </button>
+      <SettingsMenu />
       <UserMenu />
       <button
         type="button"
