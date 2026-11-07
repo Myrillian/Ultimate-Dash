@@ -294,12 +294,6 @@
         {#if summary}<span class="font-normal text-fg-muted">· {summary.serverDomain}</span>{/if}
       </h2>
       <div class="ml-auto sm:hidden">{@render viewSwitch()}</div>
-      {#if summary}
-        <div class="flex w-full gap-3 sm:w-auto">
-          <a href="/dns" class="text-xs text-accent hover:underline">Zonen und Records ›</a>
-          <a href="/dhcp" class="text-xs text-accent hover:underline">DHCP ›</a>
-        </div>
-      {/if}
 
       <div
         class="flex w-full rounded-lg border border-line bg-elevated p-0.5 sm:inline-flex sm:w-auto"

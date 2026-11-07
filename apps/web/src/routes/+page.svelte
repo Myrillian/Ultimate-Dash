@@ -22,6 +22,7 @@
   import ServiceForm from '$lib/components/ServiceForm.svelte';
   import UiIcon from '$lib/components/UiIcon.svelte';
   import UserMenu from '$lib/components/UserMenu.svelte';
+  import NetMenu from '$lib/components/NetMenu.svelte';
   import DnsPanel from '$lib/components/DnsPanel.svelte';
   import { menus } from '$lib/menus.svelte';
 
@@ -186,6 +187,7 @@
 <div class="page gap-6 sm:gap-8">
   <header class="flex flex-wrap items-center gap-3">
     <div class="flex min-w-0 items-center gap-2.5">
+      <NetMenu />
       <img src="/favicon.svg" alt="" width="32" height="32" class="size-7 sm:size-8" />
       <h1 class="truncate text-lg font-semibold tracking-tight sm:text-xl">
         {dashboard.data?.title ?? 'Ultimate Dash'}
