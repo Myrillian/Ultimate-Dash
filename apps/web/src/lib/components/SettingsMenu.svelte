@@ -9,6 +9,7 @@
   import ProxmoxDialog from './ProxmoxDialog.svelte';
   import MailDialog from './MailDialog.svelte';
   import FeedsDialog from './FeedsDialog.svelte';
+  import DhcpServersDialog from './DhcpServersDialog.svelte';
 
   let open = $state(false);
   let usersOpen = $state(false);
@@ -91,6 +92,15 @@
               <button
                 type="button"
                 class="menu-item"
+                onclick={() => choose(() => (menus.technitiumServersOpen = true))}
+              >
+                <UiIcon name="server" size={16} /> Weitere Technitium-Server
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class="menu-item"
                 onclick={() => choose(() => (menus.proxmoxOpen = true))}
               >
                 <UiIcon name="cpu" size={16} /> Proxmox VE
@@ -145,6 +155,7 @@
           </li>
         </ul>
       </section>
+      <p class="menu-version" title="Installierte Version">Ultimate Dash v{__APP_VERSION__}</p>
     </div>
   {/if}
 </div>
@@ -154,6 +165,11 @@
 {#if auth.isAdmin}
   <UsersDialog open={usersOpen} onclose={() => (usersOpen = false)} />
   <TechnitiumDialog open={menus.technitiumOpen} onclose={() => (menus.technitiumOpen = false)} />
+  <DhcpServersDialog
+    open={menus.technitiumServersOpen}
+    onclose={() => (menus.technitiumServersOpen = false)}
+    onchange={() => {}}
+  />
   <ProxmoxDialog open={menus.proxmoxOpen} onclose={() => (menus.proxmoxOpen = false)} />
   <MailDialog open={menus.mailOpen} onclose={() => (menus.mailOpen = false)} />
   <FeedsDialog open={menus.feedsOpen} onclose={() => (menus.feedsOpen = false)} />
@@ -164,6 +180,13 @@
     margin-top: 0.25rem;
     border-top: 1px solid var(--border);
     padding-top: 0.25rem;
+  }
+  .menu-version {
+    margin-top: 0.25rem;
+    border-top: 1px solid var(--border);
+    padding: 0.5rem 0.625rem 0.25rem;
+    font-size: 0.6875rem;
+    color: var(--text-muted);
   }
   .menu-heading {
     padding: 0.375rem 0.625rem 0.25rem;

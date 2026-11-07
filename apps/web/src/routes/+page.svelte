@@ -411,6 +411,9 @@
       </aside>
     {/if}
   </div>
+  <footer class="mt-8 pb-2 text-center text-xs text-fg-muted">
+    Ultimate Dash v{__APP_VERSION__}
+  </footer>
 </div>
 
 <ServiceForm
