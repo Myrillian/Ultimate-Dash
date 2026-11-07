@@ -51,7 +51,7 @@ export function extraPrivileges(permissions: Record<string, Record<string, numbe
 }
 
 const MISSING_ROLE =
-  'Bitte die Rolle PVEAuditor auf „/“ für das Token selbst vergeben (bei „Privilege Separation“ reicht es nicht, sie nur dem Benutzer zu geben): pveum acl modify / --tokens \'benutzer@realm!token\' --roles PVEAuditor';
+  "Bitte die Rolle PVEAuditor auf „/“ für das Token selbst vergeben (bei „Privilege Separation“ reicht es nicht, sie nur dem Benutzer zu geben): pveum acl modify / --tokens 'benutzer@realm!token' --roles PVEAuditor";
 
 /**
  * Fehlen dem Token Rechte, liefert Proxmox keinen Fehler: Ohne Sys.Audit erscheinen Knoten
