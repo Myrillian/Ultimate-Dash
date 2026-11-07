@@ -52,12 +52,24 @@ Die alten Werte stehen weiterhin in der Git-Historie. Weil sie nichts Geheimes e
 
 Korrigiert: Die Proxmox-Anleitung vergab die Rolle `PVEAuditor` nur dem Token. Mit „Privilege Separation“ gilt aber nur die Schnittmenge aus Benutzer- und Token-Rechten, die Rolle muss also an beide. Anleitung, Hilfetext im Dialog und Fehlermeldungen nennen jetzt beide Befehle.
 
+## Markenrecherche „Ultimate Dash“
+
+Stand 07.11.2026, nur Websuche, keine Abfrage der amtlichen Register. Keine Rechtsberatung.
+
+- Eine eingetragene Marke „Ultimate Dash“ für Software wurde nicht gefunden. Unter dem Namen gibt es ein Autopflegeprodukt, das ist eine andere Warenklasse.
+- **„DASH“ allein ist mehrfach geschützt**, auch für Software (Klasse 9). Am nächsten liegt die US-Marke von Plotly für Software, die Daten grafisch darstellt (Reg.-Nr. 6874845). Plotly vertreibt darunter das Python-Framework „Dash“ für Dashboards. Weitere „DASH“-Marken halten z. B. Amazon und die Kryptowährung Dash.
+- Ähnlich heißt das WordPress-Plugin „Ultimate Dashboard“.
+
+**Einschätzung:** Für ein nicht kommerzielles Open-Source-Projekt ist das Risiko gering. „Dash“ steht hier beschreibend für Dashboard, und mit „Ultimate“ unterscheidet sich der Name. Ganz ausschließen lässt sich ein Konflikt ohne Registerabfrage nicht, vor allem bei einer späteren kommerziellen Nutzung. Für Gewissheit eine Suche in [TMview](https://www.tmdn.org/tmview/) machen (deckt DPMA, EUIPO und weitere Ämter ab, Klassen 9 und 42) oder ein Gutachten einholen.
+
+## Erledigt nach der Veröffentlichung
+
+- **PR-Beschreibungen:** In allen 32 Pull Requests steht jetzt „Requested by **Myrillian**“. GitHub zeigt bei bearbeiteten Beschreibungen eine Versionsliste („bearbeitet“). Alte Versionen lassen sich dort einzeln löschen (_Delete revision from history_).
+- **Labels:** Die Issue-Vorlagen nutzen die vorhandenen GitHub-Standardlabels `bug` und `enhancement`.
+
 ## Offene Fragen an den Inhaber
 
-1. **PR-Beschreibungen:** Die bisherigen Pull Requests nennen den Vornamen in der Zeile „Requested by …“. Bei einem öffentlichen Repository sind sie sichtbar. Belassen, oder sollen die Texte angepasst werden?
-2. **Private Sicherheitsmeldungen** in den Repository-Einstellungen einschalten (_Settings › Code security › Private vulnerability reporting_). `SECURITY.md` verweist darauf.
-3. **Repository-Name:** Der Feed-Abruf meldet sich mit `https://github.com/myrillian/ultimate-dash`. Bleibt der Name beim Veröffentlichen gleich? GitHub ignoriert Groß- und Kleinschreibung.
-4. **Fertige Docker-Images** (z. B. über GitHub Container Registry) anbieten? Dann gelten für die enthaltenen Debian-Pakete deren Lizenzpflichten, und ein Workflow zum Bauen und Veröffentlichen wäre nötig.
-5. **Name „Ultimate Dash“:** Eine Markenrecherche wurde nicht gemacht. Wer sichergehen will, prüft beim DPMA und EUIPO, ob der Name für Software geschützt ist.
-6. **Labels** `fehler` und `idee` in GitHub anlegen, damit die Issue-Vorlagen sie setzen können.
-7. **Code of Conduct:** Für ein kleines Projekt optional. Bei Bedarf den Contributor Covenant ergänzen.
+1. **Private Sicherheitsmeldungen** einschalten, sobald das Repository öffentlich ist: _Settings › Security › Private vulnerability reporting › Enable_ (bei privaten Repositorys gibt es die Funktion nicht). `SECURITY.md` verweist darauf.
+2. **Repository-Name:** Der Feed-Abruf meldet sich mit `https://github.com/myrillian/ultimate-dash`. Bleibt der Name beim Veröffentlichen gleich? GitHub ignoriert Groß- und Kleinschreibung.
+3. **Fertige Docker-Images** (z. B. über GitHub Container Registry) anbieten? Dann gelten für die enthaltenen Debian-Pakete deren Lizenzpflichten, und ein Workflow zum Bauen und Veröffentlichen wäre nötig. Noch offen.
+4. **Code of Conduct:** Für ein kleines Projekt optional. Bei Bedarf den Contributor Covenant ergänzen.
