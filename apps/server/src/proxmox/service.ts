@@ -50,12 +50,22 @@ export function extraPrivileges(permissions: Record<string, Record<string, numbe
   return [...extra].sort();
 }
 
-/** Ohne Sys.Audit liefert Proxmox keinen Fehler, sondern einfach eine Liste ohne Knoten. */
+const MISSING_ROLE =
+  'Bitte die Rolle PVEAuditor auf „/“ für das Token selbst vergeben (bei „Privilege Separation“ reicht es nicht, sie nur dem Benutzer zu geben): pveum acl modify / --tokens \'benutzer@realm!token\' --roles PVEAuditor';
+
+/**
+ * Fehlen dem Token Rechte, liefert Proxmox keinen Fehler: Ohne Sys.Audit erscheinen Knoten
+ * nur mit Name und Status, ohne CPU und RAM; Gäste und Storages fehlen ganz.
+ */
 function requireNodes(resources: RawResource[]): RawResource[] {
   const nodes = Array.isArray(resources) ? resources.filter((r) => r.type === 'node') : [];
   if (nodes.length === 0) {
+    throw new ProxmoxError(`Das Token sieht keinen Knoten. ${MISSING_ROLE}`, 'permission');
+  }
+  const online = nodes.filter((n) => n.status === 'online');
+  if (online.length > 0 && online.every((n) => n.maxcpu === undefined)) {
     throw new ProxmoxError(
-      'Das Token sieht keinen Knoten. Bitte die Rolle PVEAuditor auf „/“ für das Token vergeben (bei „Privilege Separation“ dem Token selbst, nicht nur dem Benutzer).',
+      `Das Token sieht den Knoten, aber keine Werte (CPU, RAM, VMs). ${MISSING_ROLE}`,
       'permission',
     );
   }

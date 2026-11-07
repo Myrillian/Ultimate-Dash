@@ -198,4 +198,16 @@ describe('Proxmox-Kennzahlen ohne Rechte', () => {
     expect(res.statusCode).toBe(502);
     expect(res.json()).toMatchObject({ code: 'permission' });
   });
+
+  it('erkennt einen Knoten ohne Werte (Token ohne Sys.Audit)', async () => {
+    // So antwortet Proxmox, wenn die Rolle nur dem Benutzer, nicht dem Token gegeben wurde.
+    fake.resources = [{ id: 'node/MYR-PVE01', type: 'node', node: 'MYR-PVE01', status: 'online' }];
+    const test = await call('POST', '/api/proxmox/test', {
+      url: fake.url,
+      tokenId: fake.tokenId,
+      secret: fake.secret,
+    });
+    expect(test.statusCode).toBe(502);
+    expect(test.json().error).toMatch(/keine Werte.*PVEAuditor/);
+  });
 });
