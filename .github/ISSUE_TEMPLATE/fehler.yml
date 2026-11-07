@@ -1,0 +1,48 @@
+name: Fehler melden
+description: Etwas funktioniert nicht wie beschrieben.
+labels: [fehler]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke für die Meldung. Bitte entferne vorher Tokens, Passwörter und alles, was du nicht öffentlich teilen willst (eigene IPs, Hostnamen, Domains). Sicherheitslücken bitte nicht hier melden, sondern über _Security › Report a vulnerability_.
+  - type: textarea
+    id: was
+    attributes:
+      label: Was ist passiert?
+      description: Was hast du erwartet, was ist stattdessen passiert?
+    validations:
+      required: true
+  - type: textarea
+    id: schritte
+    attributes:
+      label: Schritte zum Nachstellen
+      placeholder: |
+        1. Einstellungen › Verbindungen › …
+        2. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version oder Commit
+      placeholder: z. B. main vom 07.11.2026 oder Commit abc1234
+  - type: dropdown
+    id: betrieb
+    attributes:
+      label: Betrieb
+      options:
+        - Docker / Docker Compose
+        - Entwicklung (pnpm dev)
+        - Anders
+  - type: input
+    id: gegenstelle
+    attributes:
+      label: Betroffene Anbindung und ihre Version
+      placeholder: z. B. Technitium 14.2, Proxmox VE 9.0
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log-Ausgabe
+      description: '`docker logs ultimate-dash`, gern mit `LOG_LEVEL=debug`. Bitte vorher bereinigen.'
+      render: text

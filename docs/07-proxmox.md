@@ -15,15 +15,16 @@ Ist Proxmox nicht verbunden, sehen Admins einen Hinweis „Proxmox VE verbinden�
 
 Einstellungen › „Verbindungen › Proxmox VE“: Adresse (`https://pve.home.lan:8006`), Token-ID (`benutzer@realm!tokenname`), Secret, optional „Zertifikat nicht prüfen“. „Verbindung prüfen“ zeigt Version, Knoten und Anzahl der Gäste; gespeichert wird nur eine funktionierende Verbindung. Darf das Token mehr als lesen, erscheint eine Warnung.
 
-Token in der Proxmox-Shell anlegen:
+Token in der Proxmox-Shell anlegen (Schritt für Schritt, auch über die Weboberfläche: [Anleitung Proxmox](anleitungen/proxmox.md)):
 
 ```sh
 pveum user add dashboard@pve
 pveum user token add dashboard@pve ultimate-dash --privsep 1
+pveum acl modify / --users 'dashboard@pve' --roles PVEAuditor
 pveum acl modify / --tokens 'dashboard@pve!ultimate-dash' --roles PVEAuditor
 ```
 
-Mit „Privilege Separation“ braucht das Token die Rolle selbst. Fehlt sie, liefert Proxmox keinen Fehler, sondern Knoten nur mit Name und Status, ohne CPU, RAM, Gäste und Storages. Ultimate Dash meldet das beim Verbindungstest und im Dashboard („Das Token sieht keinen Knoten“ bzw. „… aber keine Werte“), statt Nullen anzuzeigen. Prüfen lässt sich die Vergabe mit `pveum user token permissions dashboard@pve ultimate-dash`.
+Mit „Privilege Separation“ gilt nur die Schnittmenge aus den Rechten von Benutzer und Token, die Rolle braucht also beide. Fehlt sie bei einem davon, liefert Proxmox keinen Fehler, sondern Knoten nur mit Name und Status, ohne CPU, RAM, Gäste und Storages. Ultimate Dash meldet das beim Verbindungstest und im Dashboard („Das Token sieht keinen Knoten“ bzw. „… aber keine Werte“), statt Nullen anzuzeigen. Prüfen lässt sich die Vergabe mit `pveum user token permissions dashboard@pve ultimate-dash`.
 
 Alternativ per Umgebungsvariablen `PROXMOX_URL`, `PROXMOX_TOKEN_ID`, `PROXMOX_TOKEN_SECRET`, `PROXMOX_TLS_INSECURE=true`. Dann ist die Verbindung in der Oberfläche nur lesbar.
 

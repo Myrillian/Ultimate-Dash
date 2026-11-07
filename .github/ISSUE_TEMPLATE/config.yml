@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Sicherheitslücke melden
+    url: https://github.com/Myrillian/ultimate-dash/security/advisories/new
+    about: Bitte nicht öffentlich, sondern privat über GitHub melden.
+  - name: Anleitungen
+    url: https://github.com/Myrillian/ultimate-dash/tree/main/docs/anleitungen
+    about: Installation, Konfiguration, Technitium und Proxmox

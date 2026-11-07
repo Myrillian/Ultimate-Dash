@@ -111,7 +111,7 @@
         class="input"
         type="url"
         inputmode="url"
-        placeholder="http://10.10.0.53:5380"
+        placeholder="http://192.168.1.53:5380"
         bind:value={url}
         disabled={readonly}
         autocomplete="off"

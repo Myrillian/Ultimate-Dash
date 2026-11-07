@@ -17,6 +17,10 @@ RUN pnpm build \
  && cp -r apps/web/build /out/web
 
 FROM node:22-bookworm-slim
+LABEL org.opencontainers.image.title="Ultimate Dash" \
+      org.opencontainers.image.description="Selbst gehostetes Dashboard für Homelab und Services mit IPAM für Technitium" \
+      org.opencontainers.image.source="https://github.com/Myrillian/ultimate-dash" \
+      org.opencontainers.image.licenses="MIT"
 ENV NODE_ENV=production \
     PORT=3000 \
     DATA_DIR=/data \
@@ -26,6 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends iputils-ping \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /out ./
+COPY LICENSE NOTICE.md ./
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN mkdir -p /data && chown node:node /data
 # Kein „USER node“: das Entrypoint-Skript korrigiert die Rechte am Datenordner

@@ -108,7 +108,7 @@ export async function callProxmox<T>(
   }
   if (response.status === 403) {
     throw new ProxmoxError(
-      'Dem Token fehlen Rechte. Bitte die Rolle PVEAuditor auf „/“ für das Token vergeben.',
+      'Dem Token fehlen Rechte. Bitte die Rolle PVEAuditor auf „/“ dem Benutzer und dem Token vergeben.',
       'permission',
     );
   }

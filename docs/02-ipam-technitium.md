@@ -96,14 +96,14 @@ Diese Teile muss das IPAM selbst mitbringen:
 
 **Prüfung deines Vorschlags:** Die Idee passt gut und ist sauber umsetzbar, weil Gruppen nur im IPAM gespeichert werden und Technitium nie berühren. Zwei Punkte habe ich angepasst:
 
-- **Schreibweise:** „10.10.1.50/23 bis 10.10.1.59/23“ mischt zwei Dinge. Das Präfix /23 beschreibt das Netz (hier 10.10.0.0/23, also 10.10.0.1 bis 10.10.1.254), nicht einzelne Adressen. Eine Gruppe ist deshalb besser ein **Bereich innerhalb eines Netzes**: Netz 10.10.0.0/23, Bereich 10.10.1.50–10.10.1.59. Alternativ als CIDR-Block, wenn er passt (z. B. 10.10.1.64/28).
+- **Schreibweise:** „192.168.1.50/23 bis 192.168.1.59/23“ mischt zwei Dinge. Das Präfix /23 beschreibt das Netz (hier 192.168.0.0/23, also 192.168.0.1 bis 192.168.1.254), nicht einzelne Adressen. Eine Gruppe ist deshalb besser ein **Bereich innerhalb eines Netzes**: Netz 192.168.0.0/23, Bereich 192.168.1.50–192.168.1.59. Alternativ als CIDR-Block, wenn er passt (z. B. 192.168.1.64/28).
 - **Kategorie und Bereich trennen:** Eine Kategorie (z. B. „Schaltbare Steckdosen“) kann mehrere Bereiche haben, auch in verschiedenen Netzen oder VLANs. So lässt sich eine Gruppe später erweitern, ohne sie umzubauen.
 
 **Datenmodell:**
 
 | Objekt | Felder |
 | --- | --- |
-| Netz | Name, CIDR (z. B. 10.10.0.0/23), VLAN-ID, Gateway, Beschreibung, verknüpfter Technitium-Scope (optional), Reverse-Zone (optional) |
+| Netz | Name, CIDR (z. B. 192.168.0.0/23), VLAN-ID, Gateway, Beschreibung, verknüpfter Technitium-Scope (optional), Reverse-Zone (optional) |
 | Kategorie | Name, Icon, Farbe, Beschreibung, übergeordnete Kategorie (optional, z. B. „Smart Home › Steckdosen“), Standard-DNS-Zone und Namensschema für den Wizard |
 | Bereich | Netz, Start-IP, End-IP, Kategorie, Sortierung |
 | Adresse (abgeleitet) | IP, Status aus Technitium (Lease, Reservierung, DNS), Gruppe aus dem passenden Bereich, eigene Notiz und Tags |
@@ -161,7 +161,7 @@ Diese Teile muss das IPAM selbst mitbringen:
 
 **Schritt 5 – Zusammenfassung und Speichern**
 
-- Übersicht aller geplanten Aktionen, z. B.: Reservierung 10.10.1.54 für MAC … im Scope „LAN“ anlegen; A-Eintrag `steckdose-04.home.lan` → 10.10.1.54 anlegen; PTR anlegen.
+- Übersicht aller geplanten Aktionen, z. B.: Reservierung 192.168.1.54 für MAC … im Scope „LAN“ anlegen; A-Eintrag `steckdose-04.home.lan` → 192.168.1.54 anlegen; PTR anlegen.
 - Ausführung Schritt für Schritt mit Statusanzeige. Schlägt ein Schritt fehl, werden die schon ausgeführten rückgängig gemacht (z. B. Reservierung wieder entfernen) und die Fehlermeldung von Technitium angezeigt.
 - Eintrag im Änderungsprotokoll des IPAM.
 - Abschluss mit Buttons „Noch eine IP in dieser Gruppe“ und „Zum Gerät“.
