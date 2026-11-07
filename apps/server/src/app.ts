@@ -31,6 +31,9 @@ import { viewRoutes } from './routes/views.js';
 import { feedRoutes } from './routes/feeds.js';
 import { FeedService } from './feeds/service.js';
 import { technitiumRoutes } from './routes/technitium.js';
+import { proxmoxRoutes } from './routes/proxmox.js';
+import { ProxmoxError } from './proxmox/client.js';
+import { proxmoxFromEnv, ProxmoxService } from './proxmox/service.js';
 import { TechnitiumError } from './technitium/client.js';
 import { DhcpService } from './technitium/dhcp.js';
 import { connectionFromEnv, TechnitiumService } from './technitium/service.js';
@@ -90,6 +93,10 @@ export async function buildApp(
       if (error.kind !== 'not-configured') request.log.warn({ err: error }, 'Technitium-Fehler');
       return reply.code(error.statusCode).send({ error: error.message, code: error.kind });
     }
+    if (error instanceof ProxmoxError) {
+      if (error.kind !== 'not-configured') request.log.warn({ err: error }, 'Proxmox-Fehler');
+      return reply.code(error.statusCode).send({ error: error.message, code: error.kind });
+    }
     const status = (error as { statusCode?: number }).statusCode;
     if (status && status < 500) return reply.code(status).send({ error: (error as Error).message });
     request.log.error({ err: error }, 'Unerwarteter Fehler');
@@ -129,6 +136,12 @@ export async function buildApp(
     audit,
     envConnection: config.technitium === undefined ? connectionFromEnv() : config.technitium,
   });
+  const proxmox = new ProxmoxService({
+    db,
+    audit,
+    envConnection: config.proxmox === undefined ? proxmoxFromEnv() : config.proxmox,
+  });
+  await app.register(proxmoxRoutes, { prefix: '/api', proxmox });
   const dhcp = new DhcpService(technitium, db);
   await app.register(technitiumRoutes, { prefix: '/api', technitium, dhcp, audit });
   const ipam = new IpamRepository(db, audit);
@@ -240,5 +253,5 @@ export async function buildApp(
     close();
   });
 
-  return { app, repo, authStore, monitor, events, technitium, audit, scanner, feeds };
+  return { app, repo, authStore, monitor, events, technitium, proxmox, audit, scanner, feeds };
 }

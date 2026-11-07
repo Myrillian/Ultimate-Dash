@@ -3,6 +3,7 @@ class MenuState {
   importOpen = $state(false);
   copyOpen = $state(false);
   technitiumOpen = $state(false);
+  proxmoxOpen = $state(false);
   feedsOpen = $state(false);
 }
 

@@ -6,6 +6,7 @@
   import ImportDialog from './ImportDialog.svelte';
   import CopyDialog from './CopyDialog.svelte';
   import TechnitiumDialog from './TechnitiumDialog.svelte';
+  import ProxmoxDialog from './ProxmoxDialog.svelte';
   import FeedsDialog from './FeedsDialog.svelte';
 
   let open = $state(false);
@@ -89,6 +90,15 @@
               <button
                 type="button"
                 class="menu-item"
+                onclick={() => choose(() => (menus.proxmoxOpen = true))}
+              >
+                <UiIcon name="cpu" size={16} /> Proxmox VE
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class="menu-item"
                 onclick={() => choose(() => (menus.feedsOpen = true))}
               >
                 <UiIcon name="rss" size={16} /> Feeds verwalten
@@ -134,6 +144,7 @@
 {#if auth.isAdmin}
   <UsersDialog open={usersOpen} onclose={() => (usersOpen = false)} />
   <TechnitiumDialog open={menus.technitiumOpen} onclose={() => (menus.technitiumOpen = false)} />
+  <ProxmoxDialog open={menus.proxmoxOpen} onclose={() => (menus.proxmoxOpen = false)} />
   <FeedsDialog open={menus.feedsOpen} onclose={() => (menus.feedsOpen = false)} />
 {/if}
 

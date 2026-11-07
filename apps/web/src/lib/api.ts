@@ -67,6 +67,10 @@ import type {
   TechnitiumSettings,
   TechnitiumSettingsInput,
   TechnitiumTestResult,
+  ProxmoxSettings,
+  ProxmoxSettingsInput,
+  ProxmoxSummary,
+  ProxmoxTestResult,
 } from '@ultimate-dash/shared';
 
 export class ApiError extends Error {
@@ -149,6 +153,14 @@ export const api = {
   deleteService: (id: number) => request<void>('DELETE', `/services/${id}`),
   arrangeServices: (groupId: number, ids: number[]) =>
     request<void>('PUT', '/services/arrange', { groupId, ids }),
+
+  proxmoxSettings: () => request<ProxmoxSettings>('GET', '/proxmox/settings'),
+  saveProxmox: (input: ProxmoxSettingsInput) =>
+    request<ProxmoxTestResult>('PUT', '/proxmox/settings', input),
+  testProxmox: (input: ProxmoxSettingsInput) =>
+    request<ProxmoxTestResult>('POST', '/proxmox/test', input),
+  disconnectProxmox: () => request<void>('DELETE', '/proxmox/settings'),
+  proxmoxSummary: () => request<ProxmoxSummary>('GET', '/proxmox/summary'),
 
   technitiumSettings: () => request<TechnitiumSettings>('GET', '/technitium/settings'),
   saveTechnitium: (input: TechnitiumSettingsInput) =>
