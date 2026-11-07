@@ -18,4 +18,10 @@ services:
       # Optional: Technitium fest vorgeben, statt es in der Oberfläche einzurichten
       # TECHNITIUM_URL: http://10.10.0.53:5380
       # TECHNITIUM_TOKEN: ${TECHNITIUM_TOKEN}
+      # Optional: „Passwort vergessen“ per E-Mail (siehe README)
+      # SMTP_HOST: mail.example.org
+      # SMTP_USER: dash@example.org
+      # SMTP_PASSWORD: ${SMTP_PASSWORD}
+      # SMTP_FROM: Ultimate Dash <dash@example.org>
+      # PUBLIC_URL: https://dash.example.org
     restart: unless-stopped

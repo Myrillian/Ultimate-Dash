@@ -67,7 +67,12 @@ describe('Passwort-Hashing', () => {
 describe('Ersteinrichtung', () => {
   it('meldet zuerst, dass eine Einrichtung nötig ist', async () => {
     const res = await call({ method: 'GET', url: '/api/auth/status' });
-    expect(JSON.parse(res.body)).toEqual({ setupRequired: true, user: null, oidc: null });
+    expect(JSON.parse(res.body)).toEqual({
+      setupRequired: true,
+      user: null,
+      oidc: null,
+      passwordResetMail: false,
+    });
   });
 
   it('legt den ersten Admin an, meldet ihn an und speichert den Namen klein', async () => {
