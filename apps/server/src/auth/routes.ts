@@ -47,7 +47,8 @@ export async function authRoutes(
     store: AuthStore;
     limiter: LoginRateLimiter;
     oidc: Oidc | null;
-    mail?: { mailer: Mailer; publicUrl: string } | null;
+    /** Liefert Versand und Link-Adresse, solange ein Mailserver eingerichtet ist. */
+    mail?: { current(): { mailer: Mailer; publicUrl: string } | null } | null;
   },
 ) {
   // „Passwort vergessen“ ohne Anmeldung: pro IP und pro Konto begrenzen (kein Mail-Bombing).
@@ -60,7 +61,7 @@ export async function authRoutes(
     setupRequired: store.userCount() === 0,
     user: request.user,
     oidc: oidc?.status ?? null,
-    passwordResetMail: mail !== null,
+    passwordResetMail: mail?.current() != null,
   }));
 
   app.post('/auth/setup', async (request, reply) => {
@@ -149,11 +150,12 @@ export async function authRoutes(
     // Nur Konten mit lokalem Passwort; reine SSO-Konten setzen es beim Anbieter zurück.
     if (row?.passwordHash && forgotPerUser.retryAfter(String(row.id)) === 0) {
       forgotPerUser.fail(String(row.id));
-      if (mail && row.email) {
+      const mailer = mail?.current() ?? null;
+      if (mailer && row.email) {
         const { token } = store.createPasswordReset(row.id, 'mail');
-        const link = `${mail.publicUrl}${RESET_PATH}#token=${token}`;
+        const link = `${mailer.publicUrl}${RESET_PATH}#token=${token}`;
         // Nicht abwarten: die Antwortzeit soll nicht verraten, ob eine Mail rausging.
-        mail.mailer
+        mailer.mailer
           .send({
             to: row.email,
             subject: 'Ultimate Dash: Passwort zurücksetzen',

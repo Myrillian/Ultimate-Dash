@@ -7,6 +7,7 @@
   import CopyDialog from './CopyDialog.svelte';
   import TechnitiumDialog from './TechnitiumDialog.svelte';
   import ProxmoxDialog from './ProxmoxDialog.svelte';
+  import MailDialog from './MailDialog.svelte';
   import FeedsDialog from './FeedsDialog.svelte';
 
   let open = $state(false);
@@ -99,6 +100,15 @@
               <button
                 type="button"
                 class="menu-item"
+                onclick={() => choose(() => (menus.mailOpen = true))}
+              >
+                <UiIcon name="mail" size={16} /> Mailserver
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class="menu-item"
                 onclick={() => choose(() => (menus.feedsOpen = true))}
               >
                 <UiIcon name="rss" size={16} /> Feeds verwalten
@@ -145,6 +155,7 @@
   <UsersDialog open={usersOpen} onclose={() => (usersOpen = false)} />
   <TechnitiumDialog open={menus.technitiumOpen} onclose={() => (menus.technitiumOpen = false)} />
   <ProxmoxDialog open={menus.proxmoxOpen} onclose={() => (menus.proxmoxOpen = false)} />
+  <MailDialog open={menus.mailOpen} onclose={() => (menus.mailOpen = false)} />
   <FeedsDialog open={menus.feedsOpen} onclose={() => (menus.feedsOpen = false)} />
 {/if}
 
