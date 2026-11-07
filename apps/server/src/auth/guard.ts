@@ -18,12 +18,19 @@ const PUBLIC_ROUTES = new Set([
   'GET /api/auth/status',
   'POST /api/auth/login',
   'POST /api/auth/setup',
+  'POST /api/auth/forgot',
+  'POST /api/auth/reset/check',
+  'POST /api/auth/reset',
   'GET /api/auth/oidc/start',
   'GET /api/auth/oidc/callback',
 ]);
 
 /** Schreibende Aufrufe, die auch „Nur lesen“-Benutzer für sich selbst machen dürfen. */
-const SELF_SERVICE_ROUTES = new Set(['POST /api/auth/logout', 'POST /api/auth/password']);
+const SELF_SERVICE_ROUTES = new Set([
+  'POST /api/auth/logout',
+  'POST /api/auth/password',
+  'PUT /api/auth/email',
+]);
 
 /**
  * Das Dashboard und die gespeicherten Listenansichten gehören jedem Benutzer selbst

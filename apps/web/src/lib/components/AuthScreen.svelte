@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ApiError } from '$lib/api';
+  import { api, ApiError } from '$lib/api';
   import { auth } from '$lib/auth.svelte';
   import PasswordInput from './PasswordInput.svelte';
   import UiIcon from './UiIcon.svelte';
@@ -13,6 +13,36 @@
   let busy = $state(false);
   let errors = $state<Record<string, string>>({});
   let generalError = $state<string | null>(null);
+
+  /** Ansicht „Passwort vergessen“ innerhalb der Anmeldung. */
+  let forgot = $state(false);
+  let forgotLogin = $state('');
+  let forgotSent = $state(false);
+
+  function showForgot(value: boolean) {
+    forgot = value;
+    forgotSent = false;
+    errors = {};
+    generalError = null;
+    if (value && username) forgotLogin = username;
+  }
+
+  async function submitForgot(event: SubmitEvent) {
+    event.preventDefault();
+    errors = {};
+    generalError = null;
+    busy = true;
+    try {
+      await api.forgotPassword({ login: forgotLogin });
+      forgotSent = true;
+    } catch (error) {
+      if (error instanceof ApiError && error.issues.length > 0)
+        errors = { forgotLogin: error.fieldErrors().login ?? 'Bitte ausfüllen' };
+      else generalError = error instanceof Error ? error.message : 'Anfrage fehlgeschlagen';
+    } finally {
+      busy = false;
+    }
+  }
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
@@ -42,7 +72,11 @@
     <div class="mb-6 flex flex-col items-center gap-3 text-center">
       <img src="/favicon.svg" alt="" width="48" height="48" />
       <h1 class="text-2xl font-semibold tracking-tight">
-        {mode === 'setup' ? 'Willkommen bei Ultimate Dash' : 'Anmelden'}
+        {mode === 'setup'
+          ? 'Willkommen bei Ultimate Dash'
+          : forgot
+            ? 'Passwort vergessen'
+            : 'Anmelden'}
       </h1>
       {#if mode === 'setup'}
         <p class="text-sm text-fg-muted">
@@ -52,75 +86,149 @@
       {/if}
     </div>
 
-    <form
-      class="grid gap-4 rounded-2xl border border-line bg-elevated p-6 shadow-[var(--shadow)]"
-      onsubmit={submit}
-      novalidate
-    >
-      {#if generalError ?? (mode === 'login' ? auth.loginError : null)}
-        <p class="rounded-lg bg-down/10 px-3 py-2 text-sm text-down" role="alert">
-          {generalError ?? auth.loginError}
-        </p>
-      {/if}
-
-      {#if mode === 'login' && auth.oidc}
-        <a href="/api/auth/oidc/start" class="btn btn-primary w-full py-2.5">
-          <UiIcon name="key" size={16} />
-          {auth.oidc.label}
-        </a>
-        <div class="flex items-center gap-3 text-xs text-fg-muted" aria-hidden="true">
-          <span class="h-px flex-1 bg-line"></span> oder mit Passwort
-          <span class="h-px flex-1 bg-line"></span>
-        </div>
-      {/if}
-
-      <div>
-        <label class="field-label" for="auth-user">Benutzername</label>
-        <input
-          id="auth-user"
-          class="input"
-          bind:value={username}
-          autocomplete="username"
-          autocapitalize="none"
-          spellcheck="false"
-          required
-          aria-invalid={!!errors.username}
-          aria-describedby={errors.username ? 'auth-user-err' : undefined}
-        />
-        {#if errors.username}<p id="auth-user-err" class="field-error">{errors.username}</p>{/if}
+    {#if forgot}
+      <div class="grid gap-4 rounded-2xl border border-line bg-elevated p-6 shadow-[var(--shadow)]">
+        {#if forgotSent}
+          <p class="rounded-lg bg-up/10 px-3 py-2 text-sm" role="status">
+            {#if auth.passwordResetMail}
+              Wenn es zu diesen Angaben ein Konto mit hinterlegter E-Mail-Adresse gibt, ist jetzt
+              ein Link zum Zurücksetzen unterwegs. Er ist eine Stunde gültig. Ohne hinterlegte
+              Adresse sehen die Administratoren deine Anfrage in der Benutzerverwaltung.
+            {:else}
+              Deine Anfrage ist bei den Administratoren angekommen, falls es das Konto gibt. Sie
+              schicken dir einen Link zum Zurücksetzen oder ein neues Passwort.
+            {/if}
+          </p>
+        {:else}
+          <form class="grid gap-4" onsubmit={submitForgot} novalidate>
+            <p class="text-sm text-fg-muted">
+              {auth.passwordResetMail
+                ? 'Gib deinen Benutzernamen oder deine E-Mail-Adresse ein. Du bekommst einen Link, mit dem du ein neues Passwort festlegst.'
+                : 'Gib deinen Benutzernamen ein. Die Administratoren sehen deine Anfrage und schicken dir einen Link zum Zurücksetzen.'}
+            </p>
+            {#if generalError}
+              <p class="rounded-lg bg-down/10 px-3 py-2 text-sm text-down" role="alert">
+                {generalError}
+              </p>
+            {/if}
+            <div>
+              <label class="field-label" for="forgot-login">
+                {auth.passwordResetMail ? 'Benutzername oder E-Mail-Adresse' : 'Benutzername'}
+              </label>
+              <input
+                id="forgot-login"
+                class="input"
+                bind:value={forgotLogin}
+                autocomplete="username"
+                autocapitalize="none"
+                spellcheck="false"
+                required
+                aria-invalid={!!errors.forgotLogin}
+                aria-describedby={errors.forgotLogin ? 'forgot-login-err' : undefined}
+              />
+              {#if errors.forgotLogin}<p id="forgot-login-err" class="field-error">
+                  {errors.forgotLogin}
+                </p>{/if}
+            </div>
+            <button type="submit" class="btn btn-primary w-full py-2.5" disabled={busy}>
+              {busy
+                ? 'Bitte warten …'
+                : auth.passwordResetMail
+                  ? 'Link anfordern'
+                  : 'Anfrage senden'}
+            </button>
+          </form>
+        {/if}
+        <button
+          type="button"
+          class="text-sm text-fg-muted hover:text-fg"
+          onclick={() => showForgot(false)}
+        >
+          Zurück zur Anmeldung
+        </button>
       </div>
+    {:else}
+      <form
+        class="grid gap-4 rounded-2xl border border-line bg-elevated p-6 shadow-[var(--shadow)]"
+        onsubmit={submit}
+        novalidate
+      >
+        {#if generalError ?? (mode === 'login' ? auth.loginError : null)}
+          <p class="rounded-lg bg-down/10 px-3 py-2 text-sm text-down" role="alert">
+            {generalError ?? auth.loginError}
+          </p>
+        {/if}
 
-      <div>
-        <label class="field-label" for="auth-pass">Passwort</label>
-        <PasswordInput
-          id="auth-pass"
-          bind:value={password}
-          autocomplete={mode === 'setup' ? 'new-password' : 'current-password'}
-          error={errors.password}
-          hint={mode === 'setup' ? 'Mindestens 10 Zeichen. Ein langer Satz ist ideal.' : undefined}
-        />
-      </div>
+        {#if mode === 'login' && auth.oidc}
+          <a href="/api/auth/oidc/start" class="btn btn-primary w-full py-2.5">
+            <UiIcon name="key" size={16} />
+            {auth.oidc.label}
+          </a>
+          <div class="flex items-center gap-3 text-xs text-fg-muted" aria-hidden="true">
+            <span class="h-px flex-1 bg-line"></span> oder mit Passwort
+            <span class="h-px flex-1 bg-line"></span>
+          </div>
+        {/if}
 
-      {#if mode === 'setup'}
         <div>
-          <label class="field-label" for="auth-pass2">Passwort wiederholen</label>
+          <label class="field-label" for="auth-user">Benutzername</label>
+          <input
+            id="auth-user"
+            class="input"
+            bind:value={username}
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+            required
+            aria-invalid={!!errors.username}
+            aria-describedby={errors.username ? 'auth-user-err' : undefined}
+          />
+          {#if errors.username}<p id="auth-user-err" class="field-error">{errors.username}</p>{/if}
+        </div>
+
+        <div>
+          <label class="field-label" for="auth-pass">Passwort</label>
           <PasswordInput
-            id="auth-pass2"
-            bind:value={passwordRepeat}
-            autocomplete="new-password"
-            error={errors.passwordRepeat}
+            id="auth-pass"
+            bind:value={password}
+            autocomplete={mode === 'setup' ? 'new-password' : 'current-password'}
+            error={errors.password}
+            hint={mode === 'setup'
+              ? 'Mindestens 10 Zeichen. Ein langer Satz ist ideal.'
+              : undefined}
           />
         </div>
-      {/if}
 
-      <button
-        type="submit"
-        class="btn mt-1 w-full py-2.5"
-        class:btn-primary={mode === 'setup' || !auth.oidc}
-        disabled={busy}
-      >
-        {#if busy}Bitte warten …{:else if mode === 'setup'}Konto anlegen{:else}Anmelden{/if}
-      </button>
-    </form>
+        {#if mode === 'setup'}
+          <div>
+            <label class="field-label" for="auth-pass2">Passwort wiederholen</label>
+            <PasswordInput
+              id="auth-pass2"
+              bind:value={passwordRepeat}
+              autocomplete="new-password"
+              error={errors.passwordRepeat}
+            />
+          </div>
+        {/if}
+
+        <button
+          type="submit"
+          class="btn mt-1 w-full py-2.5"
+          class:btn-primary={mode === 'setup' || !auth.oidc}
+          disabled={busy}
+        >
+          {#if busy}Bitte warten …{:else if mode === 'setup'}Konto anlegen{:else}Anmelden{/if}
+        </button>
+        {#if mode === 'login'}
+          <button
+            type="button"
+            class="justify-self-center text-sm text-fg-muted hover:text-fg"
+            onclick={() => showForgot(true)}
+          >
+            Passwort vergessen?
+          </button>
+        {/if}
+      </form>
+    {/if}
   </div>
 </main>

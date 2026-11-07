@@ -57,6 +57,13 @@
       "when": 1793972442807,
       "tag": "0007_gespeicherte_ansichten",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1794034408382,
+      "tag": "0008_passwort_reset",
+      "breakpoints": true
     }
   ]
 }

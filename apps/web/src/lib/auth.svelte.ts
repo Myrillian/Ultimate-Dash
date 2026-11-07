@@ -3,6 +3,7 @@ import {
   type AuthStatus,
   type LoginInput,
   type OidcErrorCode,
+  type ResetPasswordInput,
   type SetupInput,
   type User,
 } from '@ultimate-dash/shared';
@@ -15,6 +16,8 @@ class AuthState {
   user = $state<User | null>(null);
   error = $state<string | null>(null);
   oidc = $state<AuthStatus['oidc']>(null);
+  /** „Passwort vergessen“ kann eine Mail schicken (sonst geht die Anfrage an einen Admin). */
+  passwordResetMail = $state(false);
   /** Meldung nach einer fehlgeschlagenen OIDC-Anmeldung (kommt als ?login_error= zurück). */
   loginError = $state<string | null>(null);
 
@@ -33,6 +36,7 @@ class AuthState {
       this.setupRequired = status.setupRequired;
       this.user = status.user;
       this.oidc = status.oidc;
+      this.passwordResetMail = status.passwordResetMail;
       this.error = null;
     } catch (error) {
       this.error = error instanceof Error ? error.message : 'Server nicht erreichbar';
@@ -57,6 +61,12 @@ class AuthState {
 
   async setup(input: SetupInput) {
     this.user = await api.setup(input);
+    this.setupRequired = false;
+  }
+
+  /** Setzt das Passwort über einen Reset-Link und meldet direkt an. */
+  async resetPassword(input: ResetPasswordInput) {
+    this.user = await api.resetPassword(input);
     this.setupRequired = false;
   }
 
