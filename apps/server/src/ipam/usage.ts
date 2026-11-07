@@ -110,7 +110,7 @@ export class IpamUsageService {
           hostId: null,
         });
     for (const lease of leases) {
-      const scope = scopes.find((s) => s.name === lease.scope);
+      const scope = scopes.find((s) => s.server === lease.server && s.name === lease.scope);
       // Reservierte Leases sind schon als Reservierung erfasst.
       if (
         lease.type === 'Reserved' &&
@@ -249,6 +249,7 @@ export class IpamUsageService {
       dhcp: {
         pool: scope
           ? {
+              server: scope.server,
               scope: scope.name,
               enabled: scope.enabled,
               excluded: scope.exclusions.some((x) => {
@@ -261,6 +262,7 @@ export class IpamUsageService {
         reservation:
           reservation && reservationScope
             ? {
+                server: reservationScope.server,
                 scope: reservationScope.name,
                 mac: reservation.hardwareAddress,
                 hostName: reservation.hostName,
@@ -269,6 +271,7 @@ export class IpamUsageService {
             : null,
         lease: lease
           ? {
+              server: lease.server,
               scope: lease.scope,
               mac: lease.hardwareAddress,
               hostName: lease.hostName,

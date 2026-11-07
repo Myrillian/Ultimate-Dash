@@ -1,5 +1,7 @@
 <script lang="ts">
   import {
+    multipleDhcpServers,
+    parseDhcpScopeKey,
     ipamHintLabels,
     ipamHints,
     type DhcpScope,
@@ -12,6 +14,7 @@
   import { api } from '$lib/api';
   import { auth } from '$lib/auth.svelte';
   import { fullName, type RecordFormValues } from '$lib/dns-records';
+  import { formatLeaseTime } from '$lib/format';
   import { categoryColor } from '$lib/ipam';
   import { toasts } from '$lib/toasts.svelte';
   import { vendors } from '$lib/vendors.svelte';
@@ -99,9 +102,13 @@
       .catch(() => undefined);
   });
 
+  const multi = $derived(multipleDhcpServers(scopes));
+  const serverName = (id: string) => scopes.find((s) => s.server === id)?.serverName ?? id;
   const scopeDomain = $derived(
-    scopes.find((s) => s.name === (detail?.dhcp.pool?.scope ?? detail?.dhcp.lease?.scope))
-      ?.domainName ?? null,
+    scopes.find((s) => {
+      const ref = detail?.dhcp.pool ?? detail?.dhcp.lease;
+      return !!ref && s.server === ref.server && s.name === ref.scope;
+    })?.domainName ?? null,
   );
 
   let confirm = $state<{
@@ -160,7 +167,13 @@
       'Lease freigeben?',
       `${address}${l.hostName ? ` (${l.hostName})` : ''} wird freigegeben. Das Gerät bekommt beim nächsten Erneuern eine Adresse, möglicherweise dieselbe.`,
       'Freigeben',
-      () => api.dhcpLeaseAction({ scope: l.scope, hardwareAddress: l.mac, action: 'remove' }),
+      () =>
+        api.dhcpLeaseAction({
+          server: l.server,
+          scope: l.scope,
+          hardwareAddress: l.mac,
+          action: 'remove',
+        }),
       'Lease freigegeben',
     );
   };
@@ -168,9 +181,15 @@
   /** Lease → Reservierung, dann Name/Kommentar, dann optional DNS; bei Fehlern wird zurückgenommen. */
   async function convertLease(values: ConvertValues) {
     const l = detail!.dhcp.lease!;
-    await api.dhcpLeaseAction({ scope: l.scope, hardwareAddress: l.mac, action: 'reserve' });
+    await api.dhcpLeaseAction({
+      server: l.server,
+      scope: l.scope,
+      hardwareAddress: l.mac,
+      action: 'reserve',
+    });
     try {
       await api.updateDhcpReservation({
+        server: l.server,
         scope: l.scope,
         hardwareAddress: l.mac,
         currentHardwareAddress: l.mac,
@@ -190,7 +209,12 @@
       }
     } catch (error) {
       await api
-        .dhcpLeaseAction({ scope: l.scope, hardwareAddress: l.mac, action: 'unreserve' })
+        .dhcpLeaseAction({
+          server: l.server,
+          scope: l.scope,
+          hardwareAddress: l.mac,
+          action: 'unreserve',
+        })
         .catch(() => undefined);
       throw new Error(
         `${error instanceof Error ? error.message : 'Fehler'} – die Reservierung wurde zurückgenommen.`,
@@ -204,7 +228,7 @@
   async function saveReservation(values: ReservationValues) {
     const current = detail!.dhcp.reservation!;
     await api.updateDhcpReservation({
-      scope: values.scope,
+      ...parseDhcpScopeKey(values.scope),
       hardwareAddress: values.hardwareAddress,
       ipAddress: values.ipAddress.trim(),
       hostName: values.hostName,
@@ -222,7 +246,7 @@
       'Reservierung löschen?',
       `${address}${r.hostName ? ` (${r.hostName})` : ''} für ${r.mac} wird gelöscht. DNS-Einträge bleiben bestehen.`,
       'Löschen',
-      () => api.deleteDhcpReservation({ scope: r.scope, hardwareAddress: r.mac }),
+      () => api.deleteDhcpReservation({ server: r.server, scope: r.scope, hardwareAddress: r.mac }),
       'Reservierung gelöscht',
     );
   };
@@ -233,7 +257,13 @@
       'Reservierung aufheben?',
       `${address} wird wieder zu einer normalen, dynamischen Lease. Voraussetzung ist, dass das Gerät gerade eine Lease hat.`,
       'Aufheben',
-      () => api.dhcpLeaseAction({ scope: r.scope, hardwareAddress: r.mac, action: 'unreserve' }),
+      () =>
+        api.dhcpLeaseAction({
+          server: r.server,
+          scope: r.scope,
+          hardwareAddress: r.mac,
+          action: 'unreserve',
+        }),
       'Reservierung aufgehoben',
     );
   };
@@ -531,7 +561,7 @@
           {@const r = detail.dhcp.reservation}
           <dl class="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1">
             <dt class="text-fg-muted">Reservierung</dt>
-            <dd>{r.scope}</dd>
+            <dd>{r.scope}{multi ? ` · ${serverName(r.server)}` : ''}</dd>
             <dt class="text-fg-muted">MAC</dt>
             <dd>
               <span class="font-mono text-xs">{r.mac}</span>
@@ -564,7 +594,7 @@
           {@const l = detail.dhcp.lease}
           <dl class="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1">
             <dt class="text-fg-muted">Lease</dt>
-            <dd>{l.scope}</dd>
+            <dd>{l.scope}{multi ? ` · ${serverName(l.server)}` : ''}</dd>
             <dt class="text-fg-muted">MAC</dt>
             <dd>
               <span class="font-mono text-xs">{l.mac}</span>
@@ -573,9 +603,9 @@
             <dt class="text-fg-muted">Hostname</dt>
             <dd>{l.hostName ?? '–'}</dd>
             <dt class="text-fg-muted">Erhalten</dt>
-            <dd>{l.obtained ?? '–'}</dd>
+            <dd>{formatLeaseTime(l.obtained)}</dd>
             <dt class="text-fg-muted">Läuft ab</dt>
-            <dd>{l.expires ?? '–'}</dd>
+            <dd>{formatLeaseTime(l.expires)}</dd>
           </dl>
           {#if auth.isAdmin}
             <div class="flex flex-wrap gap-2">
@@ -707,6 +737,7 @@
     {scopes}
     existing={detail.dhcp.reservation
       ? {
+          server: detail.dhcp.reservation.server,
           scope: detail.dhcp.reservation.scope,
           hardwareAddress: detail.dhcp.reservation.mac,
           address,

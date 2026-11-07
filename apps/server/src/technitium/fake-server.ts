@@ -459,8 +459,9 @@ export async function startFakeTechnitium(port = 0, token = 'test-token'): Promi
               leases: fake.dhcp.leases.map((l) => ({
                 ...l,
                 clientIdentifier: '1-' + l.hardwareAddress.replace(/-/g, '').toLowerCase(),
-                leaseObtained: '11/06/2026 08:00:00',
-                leaseExpires: '11/07/2026 20:00:00',
+                // Wie die echte API: ISO mit 7 Nachkommastellen
+                leaseObtained: '2026-11-06T08:00:00.1234567Z',
+                leaseExpires: '2026-11-07T20:00:00.7654321Z',
               })),
             },
           });

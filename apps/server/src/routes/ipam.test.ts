@@ -220,6 +220,50 @@ describe('IPAM-Belegung', () => {
   });
 });
 
+describe('IPAM mit zwei Technitium-Servern', () => {
+  it('zeigt Leases des zweiten Servers als Lease statt als statisch', async () => {
+    const { network } = await setup();
+    await call('PUT', '/api/technitium/settings', { url: fake.url, token: fake.token });
+    // Ohne den zweiten Server kennt das IPAM für 10.10.10.10 nur den DNS-Eintrag.
+    let u = (await call('GET', '/api/ipam/usage')).json<IpamUsage>().networks[network.id]!;
+    expect(u.addresses.find((a) => a.address === '10.10.10.10')!.type).toBe('static');
+
+    const second = await startFakeTechnitium(0, 'zweites-token');
+    try {
+      second.dhcp.scopes = [{ ...fake.dhcp.scopes[0]!, reservedLeases: [] }];
+      second.dhcp.leases = [
+        {
+          scope: 'LAN',
+          type: 'Dynamic',
+          hardwareAddress: 'AA-BB-CC-00-00-10',
+          address: '10.10.10.10',
+          hostName: 'router',
+        },
+      ];
+      const added = await call('POST', '/api/technitium/dhcp/servers', {
+        name: 'dns2',
+        url: second.url,
+        token: second.token,
+      });
+      expect(added.statusCode).toBe(200);
+      u = (await call('GET', '/api/ipam/usage')).json<IpamUsage>().networks[network.id]!;
+      expect(u.addresses.find((a) => a.address === '10.10.10.10')!.type).toBe('lease');
+      // Reservierungen und Leases des Hauptservers bleiben erhalten.
+      expect(u.addresses.find((a) => a.address === '10.10.10.20')!.type).toBe('reservation');
+
+      const d = (await call('GET', '/api/ipam/ip/10.10.10.10')).json<IpamIpDetail>();
+      expect(d.dhcp.lease).toMatchObject({ server: added.json().id, scope: 'LAN' });
+
+      // Beide Server bedienen dasselbe Netz: nur ein Vorschlag.
+      await call('DELETE', `/api/ipam/networks/${network.id}`);
+      const sync = (await call('GET', '/api/ipam/sync')).json<IpamSync>();
+      expect(sync.suggestions.filter((x) => x.cidr === '10.10.10.0/24')).toHaveLength(1);
+    } finally {
+      await second.close();
+    }
+  });
+});
+
 describe('Hersteller', () => {
   it('liefert Hersteller zu Kennungen, auch für Nur-lesen-Benutzer, und ignoriert Ungültiges', async () => {
     await setup();

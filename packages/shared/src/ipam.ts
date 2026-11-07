@@ -237,14 +237,17 @@ export interface IpamIpDetail {
   hostName: string | null;
   dhcp: {
     /** Scope, dessen Bereich die Adresse enthält */
-    pool: { scope: string; enabled: boolean; excluded: boolean } | null;
+    pool: { server: string; scope: string; enabled: boolean; excluded: boolean } | null;
     reservation: {
+      /** Technitium-Server, auf dem die Reservierung liegt */
+      server: string;
       scope: string;
       mac: string;
       hostName: string | null;
       comment: string | null;
     } | null;
     lease: {
+      server: string;
       scope: string;
       mac: string;
       hostName: string | null;
