@@ -122,7 +122,7 @@
               <p class="truncate font-mono text-xs text-fg-muted">{server.url}</p>
               {#if server.primary}
                 <p class="text-xs text-fg-muted">
-                  Änderbar im Benutzermenü unter „Technitium DNS“.
+                  Änderbar in den Einstellungen unter „Verbindungen › Technitium DNS“.
                 </p>
               {:else if !server.ownToken}
                 <p class="text-xs text-fg-muted">Nutzt das Token der Hauptverbindung.</p>

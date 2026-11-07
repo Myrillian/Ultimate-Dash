@@ -23,6 +23,7 @@
   import SavedViews from '$lib/components/SavedViews.svelte';
   import TechNav from '$lib/components/TechNav.svelte';
   import UiIcon from '$lib/components/UiIcon.svelte';
+  import SettingsMenu from '$lib/components/SettingsMenu.svelte';
   import UserMenu from '$lib/components/UserMenu.svelte';
 
   const LIMIT = 1000;
@@ -242,6 +243,7 @@
       >
         <UiIcon name={theme.current === 'dark' ? 'sun' : 'moon'} />
       </button>
+      <SettingsMenu />
       <UserMenu />
     </div>
   </header>

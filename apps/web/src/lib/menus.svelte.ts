@@ -1,4 +1,4 @@
-/** Dialoge, die sowohl aus dem Benutzermenü als auch vom Dashboard aus geöffnet werden. */
+/** Dialoge, die sowohl aus dem Einstellungen-Menü als auch von den Seiten aus geöffnet werden. */
 class MenuState {
   importOpen = $state(false);
   copyOpen = $state(false);
