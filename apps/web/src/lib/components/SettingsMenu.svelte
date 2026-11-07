@@ -6,6 +6,7 @@
   import ImportDialog from './ImportDialog.svelte';
   import CopyDialog from './CopyDialog.svelte';
   import TechnitiumDialog from './TechnitiumDialog.svelte';
+  import FeedsDialog from './FeedsDialog.svelte';
 
   let open = $state(false);
   let usersOpen = $state(false);
@@ -84,6 +85,15 @@
                 <UiIcon name="server" size={16} /> Technitium DNS
               </button>
             </li>
+            <li>
+              <button
+                type="button"
+                class="menu-item"
+                onclick={() => choose(() => (menus.feedsOpen = true))}
+              >
+                <UiIcon name="rss" size={16} /> Feeds verwalten
+              </button>
+            </li>
           </ul>
         </section>
       {/if}
@@ -124,6 +134,7 @@
 {#if auth.isAdmin}
   <UsersDialog open={usersOpen} onclose={() => (usersOpen = false)} />
   <TechnitiumDialog open={menus.technitiumOpen} onclose={() => (menus.technitiumOpen = false)} />
+  <FeedsDialog open={menus.feedsOpen} onclose={() => (menus.feedsOpen = false)} />
 {/if}
 
 <style>

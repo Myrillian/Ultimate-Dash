@@ -4,6 +4,7 @@
   import EmailDialog from './EmailDialog.svelte';
   import PasswordDialog from './PasswordDialog.svelte';
   import UiIcon from './UiIcon.svelte';
+  import { news } from '$lib/feeds.svelte';
 
   let open = $state(false);
   let passwordOpen = $state(false);
@@ -82,7 +83,17 @@
             </button>
           </li>
         {/if}
-        <li class={auth.user?.hasPassword ? 'mt-1 border-t border-line pt-1' : ''}>
+        <li>
+          <button
+            type="button"
+            class="menu-item"
+            onclick={() => choose(() => news.setHidden(!news.prefs.hidden))}
+          >
+            <UiIcon name="news" size={16} />
+            {news.prefs.hidden ? 'Neuigkeiten einblenden' : 'Neuigkeiten ausblenden'}
+          </button>
+        </li>
+        <li class="mt-1 border-t border-line pt-1">
           <button type="button" class="menu-item" onclick={() => choose(() => void auth.logout())}>
             <UiIcon name="logout" size={16} /> Abmelden
           </button>
