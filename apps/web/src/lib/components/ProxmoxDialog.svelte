@@ -189,12 +189,14 @@
           <pre class="overflow-x-auto rounded bg-muted p-2 text-xs text-fg"><code
               >pveum user add dashboard@pve
 pveum user token add dashboard@pve ultimate-dash --privsep 1
+pveum acl modify / --users 'dashboard@pve' --roles PVEAuditor
 pveum acl modify / --tokens 'dashboard@pve!ultimate-dash' --roles PVEAuditor</code
             ></pre>
           <p>
-            Der zweite Befehl gibt das Secret aus („value“). Alternativ in der Oberfläche unter
-            Rechenzentrum › Berechtigungen › API-Token und dort unter Berechtigungen die Rolle für
-            das Token vergeben.
+            Der zweite Befehl gibt das Secret aus („value“). Die Rolle braucht der Benutzer
+            <b class="text-fg">und</b> das Token, weil mit „Privilege Separation“ nur gilt, was beide
+            haben. Alternativ in der Oberfläche unter Rechenzentrum › Berechtigungen › Hinzufügen einmal
+            als Benutzer-Berechtigung und einmal als API-Token-Berechtigung.
           </p>
         </div>
       </details>

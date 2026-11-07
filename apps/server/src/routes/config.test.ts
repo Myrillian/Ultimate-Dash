@@ -53,7 +53,7 @@ groups:
         icon: di:proxmox
         tags: [vm, homelab]
       - name: Technitium
-        url: http://10.10.0.53:5380
+        url: http://192.168.1.53:5380
         statusCheck: false
   - name: Smart Home
     collapsed: true
@@ -85,7 +85,7 @@ describe('YAML-Export und -Import', () => {
     const file = parse(exported.body);
     expect(file.groups[0].services[1]).toEqual({
       name: 'Technitium',
-      url: 'http://10.10.0.53:5380',
+      url: 'http://192.168.1.53:5380',
       statusCheck: false,
     });
     expect(file.groups[1]).toMatchObject({ collapsed: true });

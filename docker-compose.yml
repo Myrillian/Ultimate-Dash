@@ -6,26 +6,9 @@ services:
       - '3000:3000'
     volumes:
       - ./data:/data
-    environment:
-      # Abstand der Statusprüfungen in Sekunden
-      STATUS_INTERVAL_SECONDS: 60
-      # Optional: Anmeldung über OIDC (siehe README)
-      # OIDC_ISSUER: https://auth.example.org/application/o/ultimate-dash/
-      # OIDC_CLIENT_ID: ultimate-dash
-      # OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
-      # OIDC_BUTTON_LABEL: Mit Authentik anmelden
-      # OIDC_ADMIN_GROUPS: homelab-admins
-      # Optional: Technitium fest vorgeben, statt es in der Oberfläche einzurichten
-      # TECHNITIUM_URL: http://10.10.0.53:5380
-      # TECHNITIUM_TOKEN: ${TECHNITIUM_TOKEN}
-      # Optional: Proxmox fest vorgeben (Token mit Rolle PVEAuditor)
-      # PROXMOX_URL: https://pve.home.lan:8006
-      # PROXMOX_TOKEN_ID: dashboard@pve!ultimate-dash
-      # PROXMOX_TOKEN_SECRET: ${PROXMOX_TOKEN_SECRET}
-      # Optional: „Passwort vergessen“ per E-Mail (siehe README)
-      # SMTP_HOST: mail.example.org
-      # SMTP_USER: dash@example.org
-      # SMTP_PASSWORD: ${SMTP_PASSWORD}
-      # SMTP_FROM: Ultimate Dash <dash@example.org>
-      # PUBLIC_URL: https://dash.example.org
+    # Optionale Einstellungen: cp .env.example .env und dort eintragen.
+    # Erklärung aller Variablen: docs/anleitungen/konfiguration.md
+    env_file:
+      - path: .env
+        required: false
     restart: unless-stopped

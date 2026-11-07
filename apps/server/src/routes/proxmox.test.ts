@@ -201,7 +201,7 @@ describe('Proxmox-Kennzahlen ohne Rechte', () => {
 
   it('erkennt einen Knoten ohne Werte (Token ohne Sys.Audit)', async () => {
     // So antwortet Proxmox, wenn die Rolle nur dem Benutzer, nicht dem Token gegeben wurde.
-    fake.resources = [{ id: 'node/MYR-PVE01', type: 'node', node: 'MYR-PVE01', status: 'online' }];
+    fake.resources = [{ id: 'node/pve', type: 'node', node: 'pve', status: 'online' }];
     const test = await call('POST', '/api/proxmox/test', {
       url: fake.url,
       tokenId: fake.tokenId,

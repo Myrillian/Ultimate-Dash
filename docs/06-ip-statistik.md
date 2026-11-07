@@ -1,6 +1,6 @@
 # Statistik je Netz
 
-> Stand: 07.11.2026. Abgestimmt mit Matthias im Projekt-Thread (alle Zusatzkennzahlen, Verlauf und Summenzeile gewünscht).
+> Stand: 07.11.2026. Mit dem Projektinhaber abgestimmt (alle Zusatzkennzahlen, Verlauf und Summenzeile gewünscht).
 
 ## Ziel
 

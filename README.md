@@ -1,8 +1,27 @@
 # Ultimate Dash
 
-Ein selbst gehostetes Dashboard für Homelab und Services: Startseite, Service-Übersicht mit Live-Status und Widgets, dazu ein vollständiges IPAM mit Integration in Technitium DNS Server.
+Ein selbst gehostetes Dashboard für Homelab und Services: Startseite, Service-Übersicht mit Live-Status, DNS-Statistik und Blocking, Proxmox-Auslastung, Neuigkeiten per RSS und ein vollständiges IPAM mit Integration in Technitium DNS Server.
 
-> **Status:** Frühe Entwicklung (Phase 1, Kern-Dashboard). Noch ohne Login, daher nur im vertrauenswürdigen Netz betreiben.
+> **Status:** in aktiver Entwicklung. Anmeldung mit lokalen Konten oder OIDC ist vorhanden. Gedacht für den Betrieb im eigenen Netz, nicht ungeschützt im Internet.
+
+## Schnellstart
+
+```bash
+git clone https://github.com/Myrillian/ultimate-dash.git
+cd ultimate-dash
+docker compose up -d --build
+```
+
+Danach `http://<IP des Hosts>:3000` öffnen und das erste Administrator-Konto anlegen. Technitium, Proxmox und den Mailserver richtest du anschließend unter **Einstellungen › Verbindungen** ein.
+
+## Anleitungen
+
+| Anleitung                                          | Inhalt                                               |
+| -------------------------------------------------- | ---------------------------------------------------- |
+| [Installation](docs/anleitungen/installation.md)   | Docker, erstes Konto, Update, Backup, Reverse-Proxy  |
+| [Konfiguration](docs/anleitungen/konfiguration.md) | Umgebungsvariablen, Einstellungen, Mailserver, OIDC  |
+| [Technitium DNS](docs/anleitungen/technitium.md)   | Benutzer, Rechte und Token, mehrere Server           |
+| [Proxmox VE](docs/anleitungen/proxmox.md)          | Nur-Lese-Token mit PVEAuditor für Benutzer und Token |
 
 ## Ziele
 
@@ -12,15 +31,19 @@ Ein selbst gehostetes Dashboard für Homelab und Services: Startseite, Service-�
 - **DNS-Statistiken und Blocking:** Grafiken zu Queries und Blocking, Blocking pausieren, Domains blockieren oder erlauben
 - **Sicherheit:** alle Fremd-APIs laufen über das Backend, Login lokal oder per OIDC, Änderungsprotokoll
 
-## Dokumentation
+## Weitere Dokumentation
 
-| Dokument                                          | Inhalt                                                                                |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| [Feature-Vergleich](docs/01-feature-vergleich.md) | Analyse von Homepage, Dashy, Heimdall, Flame, Mafl und Rackula mit Vergleichstabellen |
-| [IPAM & Technitium](docs/02-ipam-technitium.md)   | Was die Technitium-API kann, was fehlt, Gerätegruppen, Wizard „Neue IP“               |
-| [Architektur](docs/03-architektur.md)             | Frontend, Backend, Phasen, Risiken, Limitierungen                                     |
-| [Entscheidungen](docs/04-entscheidungen.md)       | Getroffene Grundsatzentscheidungen                                                    |
-| [Proxmox](docs/07-proxmox.md)                     | Anbindung, Kennzahlen, Anzeige und Token-Sicherheit                                   |
+| Dokument                                                                           | Inhalt                                                         |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| [Feature-Vergleich](docs/01-feature-vergleich.md)                                  | Analyse von Homepage, Dashy, Heimdall, Flame, Mafl und Rackula |
+| [IPAM & Technitium](docs/02-ipam-technitium.md)                                    | Was die Technitium-API kann, Gerätegruppen, Wizard „Neue IP“   |
+| [Architektur](docs/03-architektur.md)                                              | Frontend, Backend, Phasen, Risiken                             |
+| [Entscheidungen](docs/04-entscheidungen.md)                                        | Getroffene Grundsatzentscheidungen                             |
+| [IP-Verwaltung](docs/05-ip-verwaltung.md), [IP-Statistik](docs/06-ip-statistik.md) | Konzept der IP-Ansicht und Kennzahlen je Netz                  |
+| [RSS-Feeds](docs/06-rss-feeds.md)                                                  | Abruf, Speicherung, mitgelieferte Feeds                        |
+| [Proxmox](docs/07-proxmox.md)                                                      | Technische Details der Anbindung                               |
+| [Rechtliches](docs/rechtliches.md)                                                 | Lizenz, Haftung, Datenschutz, Feeds, Marken                    |
+| [Veröffentlichung](docs/08-veroeffentlichung.md)                                   | Prüfbericht vor der Veröffentlichung, offene Fragen            |
 
 ## Stack
 
@@ -30,22 +53,10 @@ SvelteKit (SPA) + Tailwind im Frontend, Fastify im Backend, SQLite (Drizzle ORM)
 apps/web        SvelteKit-Frontend
 apps/server     Fastify-Backend, Datenbank, Statusprüfung
 packages/shared Gemeinsame Typen und Validierung (Zod)
-docs/           Planung und Entscheidungen
+docs/           Planung, Entscheidungen, Anleitungen
 ```
 
-## Starten
-
-### Docker
-
-```bash
-docker compose up -d --build
-```
-
-Danach läuft das Dashboard auf `http://<IP des Hosts>:3000`. Daten liegen in `./data`; die Rechte des Ordners setzt der Container beim Start selbst.
-
-Voraussetzung ist Docker mit dem Compose-Plugin. Meldet `docker compose` „unknown shorthand flag: 'd'“, fehlt das Plugin (häufig bei Docker aus dem Paket `docker.io`). Unter Ubuntu hilft `apt install docker-compose-v2`, sonst die [offizielle Anleitung](https://docs.docker.com/compose/install/linux/).
-
-### Entwicklung
+## Entwicklung
 
 Voraussetzungen: Node.js 22 und pnpm (`corepack enable`).
 
@@ -57,22 +68,7 @@ pnpm test         # Tests
 pnpm format       # Formatierung
 ```
 
-### Umgebungsvariablen
-
-| Variable                  | Standard | Bedeutung                              |
-| ------------------------- | -------- | -------------------------------------- |
-| `PORT`                    | `3000`   | HTTP-Port                              |
-| `DATA_DIR`                | `./data` | Ordner für die SQLite-Datenbank        |
-| `STATUS_INTERVAL_SECONDS` | `60`     | Abstand der Statusprüfungen            |
-| `FEED_INTERVAL_MINUTES`   | `30`     | Abstand der Abrufe je RSS-Feed         |
-| `STATUS_TIMEOUT_MS`       | `5000`   | Zeitlimit pro Statusprüfung            |
-| `LOG_LEVEL`               | `info`   | `debug`, `info`, `warn`, `error`       |
-| `LOG_REQUESTS`            | `false`  | Jede HTTP-Anfrage loggen               |
-| `TECHNITIUM_URL`          | –        | Feste Technitium-Adresse (siehe unten) |
-| `TECHNITIUM_TOKEN`        | –        | API-Token dazu                         |
-| `PROXMOX_URL`             | –        | Feste Proxmox-Adresse (siehe unten)    |
-| `PROXMOX_TOKEN_ID`        | –        | Token-ID dazu                          |
-| `PROXMOX_TOKEN_SECRET`    | –        | Secret des Tokens                      |
+Mehr dazu in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Anmeldung und Benutzer
 
@@ -89,63 +85,13 @@ Passwörter werden mit scrypt gespeichert, Sitzungen laufen 30 Tage und verläng
 
 ### Passwort vergessen
 
-Auf der Anmeldeseite gibt es _Passwort vergessen?_. Was dann passiert, hängt davon ab, ob ein Mailserver eingerichtet ist:
+Auf der Anmeldeseite gibt es _Passwort vergessen?_. Mit eingerichtetem Mailserver (Einstellungen › _Verbindungen_ › _Mailserver_ oder `SMTP_*`-Variablen) bekommt der Benutzer einen Link per Mail, der eine Stunde gilt. Ohne Mailserver sehen Admins die Anfrage in der Benutzerverwaltung und geben einen Reset-Link selbst weiter. Einrichtung und alle Variablen: [Konfiguration › Mailserver](docs/anleitungen/konfiguration.md#mailserver).
 
-- **Mit Mailserver** (Einstellungen › _Verbindungen_ › _Mailserver_ oder Umgebungsvariablen, siehe unten) und hinterlegter E-Mail-Adresse bekommt der Benutzer einen Link, der eine Stunde gültig ist und nur einmal funktioniert.
-- **Ohne Mailserver** oder ohne Adresse sehen die Admins die Anfrage in der Benutzerverwaltung. Dort erzeugen sie einen Reset-Link (24 Stunden gültig) und geben ihn selbst weiter, oder sie setzen direkt ein neues Passwort.
-
-Die Seite antwortet immer gleich, damit sich darüber keine Benutzernamen ausforschen lassen. Nach dem Zurücksetzen ist der Benutzer auf allen anderen Geräten abgemeldet. Die eigene E-Mail-Adresse pflegt jeder im Benutzermenü.
-
-Den Mailserver richten Admins unter Einstellungen › _Verbindungen_ › _Mailserver_ ein: Server (IP oder DNS-Name), Port, Verschlüsselung (STARTTLS, SSL/TLS oder keine), Benutzer, Passwort, Absender und die Adresse des Dashboards. Gespeichert wird nur, wenn Verbindung und Anmeldung klappen; _Testmail senden_ prüft die eingegebenen Werte vorher mit einer echten Mail. Das Passwort bleibt im Server und wird nie wieder angezeigt.
-
-Alternativ lässt sich der Mailserver fest per Umgebungsvariablen vorgeben. Ist `SMTP_HOST` gesetzt, gelten diese Werte und die Oberfläche zeigt sie nur an (wie bei Technitium und Proxmox).
-
-| Variable            | Standard            | Bedeutung                                                                   |
-| ------------------- | ------------------- | --------------------------------------------------------------------------- |
-| `SMTP_HOST`         |                     | Mailserver; ohne diesen Wert ist er in der Oberfläche einstellbar           |
-| `SMTP_PORT`         | `587`               | Port                                                                        |
-| `SMTP_ENCRYPTION`   | siehe `SMTP_SECURE` | `starttls` (STARTTLS ist Pflicht), `tls` (direkt per TLS) oder `none`       |
-| `SMTP_SECURE`       | `true` bei Port 465 | Ohne `SMTP_ENCRYPTION`: `true` = `tls`, sonst `starttls`                    |
-| `SMTP_USER`         |                     | Benutzername am Mailserver                                                  |
-| `SMTP_PASSWORD`     |                     | Passwort dazu                                                               |
-| `SMTP_FROM`         |                     | Absender, z. B. `Ultimate Dash <dash@example.org>` (Pflicht mit SMTP)       |
-| `SMTP_TLS_INSECURE` | `false`             | Selbstsignierte Zertifikate am Mailserver akzeptieren                       |
-| `PUBLIC_URL`        |                     | Adresse des Dashboards für Links in Mails, z. B. `https://dash.example.org` |
-
-`PUBLIC_URL` ist mit `SMTP_HOST` Pflicht; ist es gesetzt, gilt es auch für den in der Oberfläche eingerichteten Mailserver. Ohne Umgebungsvariable wird die Adresse im Formular hinterlegt. Fest eingestellt sein muss sie, weil Links in Mails sonst aus dem `Host`-Header gebaut würden, den ein Angreifer fälschen kann.
-
-**Einziger Admin ausgesperrt?** Einen Reset-Link auf der Kommandozeile erzeugen und im Browser öffnen:
-
-```sh
-docker exec -u node ultimate-dash node dist/main.js reset-link admin
-```
-
-Ist `PUBLIC_URL` nicht gesetzt, enthält der Link einen Platzhalter für die Adresse. `-u node` sorgt dafür, dass die Datenbankdateien dem richtigen Benutzer gehören.
+Einziger Admin ausgesperrt? `docker exec -u node ultimate-dash node dist/main.js reset-link admin` erzeugt einen Reset-Link.
 
 ### Anmeldung über OIDC (Authentik, Keycloak, Authelia, Pocket ID …)
 
-Mit OIDC erscheint auf der Anmeldeseite zusätzlich ein Knopf für deinen SSO-Anbieter. Das lokale Admin-Konto aus der Ersteinrichtung bleibt als Notzugang bestehen.
-
-1. Beim Anbieter eine OIDC-Anwendung („confidential client“) anlegen.
-   Redirect-URI: `https://<deine-dashboard-adresse>/api/auth/oidc/callback`
-2. Umgebungsvariablen setzen und den Container neu starten:
-
-| Variable                | Standard               | Bedeutung                                                                                                                              |
-| ----------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `OIDC_ISSUER`           |                        | Issuer-URL, z. B. `https://auth.example.org/application/o/ultimate-dash/` (Authentik)                                                  |
-| `OIDC_CLIENT_ID`        |                        | Client-ID                                                                                                                              |
-| `OIDC_CLIENT_SECRET`    |                        | Client-Secret (leer lassen bei öffentlichen Clients)                                                                                   |
-| `OIDC_REDIRECT_URI`     | aus der Anfrage        | Feste Callback-Adresse, falls der Reverse-Proxy `Host`/`X-Forwarded-Proto` nicht korrekt weitergibt                                    |
-| `OIDC_SCOPES`           | `openid profile email` | Für Gruppen ggf. `groups` ergänzen (Authelia, Keycloak mit Mapper)                                                                     |
-| `OIDC_BUTTON_LABEL`     | `Mit SSO anmelden`     | Beschriftung des Knopfs                                                                                                                |
-| `OIDC_GROUPS_CLAIM`     | `groups`               | Claim mit den Gruppen                                                                                                                  |
-| `OIDC_ADMIN_GROUPS`     |                        | Kommagetrennt. Mitglieder werden Admin, alle anderen „Benutzer“; wird bei jeder Anmeldung abgeglichen                                  |
-| `OIDC_ALLOWED_GROUPS`   |                        | Kommagetrennt. Nur Mitglieder dürfen sich anmelden                                                                                     |
-| `OIDC_AUTO_CREATE`      | `true`                 | Unbekannte Konten beim ersten Login anlegen; bei `false` werden nur bereits verknüpfte Konten angemeldet                               |
-| `OIDC_LINK_BY_USERNAME` | `false`                | Erste SSO-Anmeldung mit einem gleichnamigen lokalen Benutzer verbinden (nur, wenn Benutzernamen beim Anbieter nicht frei wählbar sind) |
-| `OIDC_TLS_INSECURE`     | `false`                | Selbstsignierte Zertifikate des Anbieters akzeptieren                                                                                  |
-
-Konten werden über den `sub`-Claim des Anbieters zugeordnet, eine Umbenennung dort ist also unproblematisch. Ohne `OIDC_ADMIN_GROUPS` werden neue SSO-Benutzer mit der Rolle „Benutzer“ angelegt, und ein Admin vergibt die Rolle in der Benutzerverwaltung. Damit der letzte Admin sich nicht aussperrt, wird er durch fehlende Gruppen nie herabgestuft. Abmelden beendet nur die Sitzung im Dashboard, nicht die beim Anbieter.
+Mit OIDC erscheint auf der Anmeldeseite zusätzlich ein Knopf für deinen SSO-Anbieter, Rollen lassen sich über Gruppen vergeben. Das lokale Admin-Konto bleibt als Notzugang. Einrichtung: [Konfiguration › OIDC](docs/anleitungen/konfiguration.md#anmeldung-über-oidc-authentik-keycloak-authelia-pocket-id-).
 
 ## Icons
 
@@ -183,7 +129,7 @@ groups:
         icon: di:proxmox
         tags: [vm, homelab]
       - name: Technitium
-        url: http://10.10.0.53:5380
+        url: http://192.168.1.53:5380
         icon: sh:technitium
         statusCheck: false
 ```
@@ -194,9 +140,7 @@ Weitere Felder pro Service: `description`, `target` (`_blank` oder `_self`), `st
 
 Ist Technitium verbunden, zeigt das Dashboard oben einen DNS-Bereich: Anfragen, Geblockt, Cache-Anteil und Clients, den Verlauf (auch als Tabelle), woher die Antworten kamen, sowie Top-Domains, geblockte Domains und Top-Clients. Der Zeitraum (1 Stunde bis 1 Jahr) gilt für alles darin. Admins können das Blocking für 5, 15 oder 60 Minuten pausieren, dauerhaft aus- und wieder einschalten und die Blocklisten sofort aktualisieren. Jede dieser Änderungen landet mit Benutzer und Zeitpunkt im Änderungsprotokoll.
 
-**Einrichten:** Einstellungen › _Verbindungen › Technitium DNS_, Adresse der Weboberfläche (z. B. `http://10.10.0.53:5380`) und ein API-Token eintragen. Das Token erzeugst du in Technitium unter _Administration › Sessions › Create Token_, am besten für einen eigenen Benutzer. Für die Statistik genügt die Berechtigung _Dashboard: View_, für das Blocking zusätzlich _Settings: Modify_. Gespeichert wird nur, wenn die Verbindung klappt.
-
-Das Token bleibt auf dem Server (in der SQLite-Datei) und wird nie an den Browser geschickt. Alle Anfragen an Technitium laufen über das Backend. Wer die Verbindung lieber fest vorgibt, setzt `TECHNITIUM_URL` und `TECHNITIUM_TOKEN` (optional `TECHNITIUM_TLS_INSECURE=true` bei selbst signiertem Zertifikat); dann ist sie in der Oberfläche nur lesbar.
+**Einrichten:** Einstellungen › _Verbindungen › Technitium DNS_, Adresse der Weboberfläche und ein API-Token eintragen. Welche Rechte das Token für welche Funktion braucht und wie du weitere DHCP-Server anbindest, steht in der [Anleitung Technitium](docs/anleitungen/technitium.md). Das Token bleibt auf dem Server und wird nie an den Browser geschickt.
 
 ### Zonen und Records
 
@@ -218,15 +162,16 @@ Zum Ausprobieren ohne echten Server gibt es eine Simulation: `pnpm --filter @ult
 
 Ist Proxmox verbunden, sehen Admins unter dem DNS-Bereich die Kernwerte des Hosts: CPU, RAM, Netzwerk- und Storage-Durchsatz, belegten Platz der Datastores sowie laufende VMs und Container. Als Balken zeigt das Überfahren von „VMs“ oder „CTs“ die gestoppten Gäste mit Namen; die kompakte Ansicht zeigt Kacheln mit Verlauf und alle Datastores. Benutzer ohne Admin-Rolle sehen den Bereich nicht. Der Zugriff ist rein lesend.
 
-**Einrichten:** Einstellungen › _Verbindungen › Proxmox VE_, Adresse (z. B. `https://pve.home.lan:8006`), Token-ID und Secret eintragen. Ein passendes Token legst du in der Proxmox-Shell an:
+**Einrichten:** Einstellungen › _Verbindungen › Proxmox VE_, Adresse, Token-ID und Secret eintragen. Das Token braucht die Rolle `PVEAuditor`, und zwar für den Benutzer **und** für das Token selbst, weil mit „Privilege Separation“ nur gilt, was beide haben:
 
 ```sh
 pveum user add dashboard@pve
 pveum user token add dashboard@pve ultimate-dash --privsep 1
+pveum acl modify / --users 'dashboard@pve' --roles PVEAuditor
 pveum acl modify / --tokens 'dashboard@pve!ultimate-dash' --roles PVEAuditor
 ```
 
-Fest vorgeben lässt sich die Verbindung mit `PROXMOX_URL`, `PROXMOX_TOKEN_ID` und `PROXMOX_TOKEN_SECRET` (optional `PROXMOX_TLS_INSECURE=true`). Details: `docs/07-proxmox.md`.
+Schritt für Schritt, auch über die Weboberfläche: [Anleitung Proxmox](docs/anleitungen/proxmox.md).
 
 ## IPAM
 
@@ -258,3 +203,13 @@ Unter **IPAM** (Umschalter neben DNS und DHCP) verwaltest du deine Netze:
 **Ping-Prüfung:** Ultimate Dash pingt alle 30 Minuten (einstellbar von 5 Minuten bis 1 Tag) jede Adresse der Netze, bei denen „Per Ping prüfen“ aktiv ist (Netze bis /22, höchstens 32 Pings gleichzeitig). „Jetzt scannen“ in der Kopfzeile startet einen Durchlauf sofort. Antwortet eine Adresse, die weder in DHCP noch im DNS steht, wird sie als **entdeckt** aufgenommen, in Liste und Raster hervorgehoben und bleibt dort, solange sie antwortet. Admins können sie bestätigen (mit Name, dann gilt sie als bekannt und bleibt auch offline belegt) oder vergessen. Geräte, die Ping blockieren, erscheinen als offline beziehungsweise bleiben unentdeckt. Der Ping kommt vom Server aus, das Netz muss also von dort erreichbar sein (Routing/VLAN, im Docker-Image ist `ping` enthalten).
 
 Ohne Verbindung zu Technitium lassen sich Netze und Bereiche trotzdem pflegen, nur die Belegung fehlt. Änderungen sind Admins vorbehalten und stehen im Änderungsprotokoll.
+
+## Lizenz und rechtliche Hinweise
+
+Ultimate Dash steht unter der [MIT-Lizenz](LICENSE). Verwendete Software, Daten und Marken nennt [NOTICE.md](NOTICE.md), Hinweise zu Haftung, Datenschutz und RSS-Inhalten stehen in [docs/rechtliches.md](docs/rechtliches.md) (keine Rechtsberatung).
+
+Die Software kommt ohne Gewähr. Sie kann in Technitium DNS-Einträge und DHCP-Reservierungen ändern. Lege vorher Backups an.
+
+Proxmox® ist eine eingetragene Marke der Proxmox Server Solutions GmbH. Technitium, Docker und alle weiteren genannten Namen gehören ihren Inhabern. Ultimate Dash ist ein unabhängiges Projekt und steht in keiner Verbindung zu ihnen.
+
+Sicherheitslücken bitte vertraulich melden, siehe [SECURITY.md](SECURITY.md). Beiträge sind willkommen, siehe [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -1,6 +1,6 @@
 # Vereinheitlichte IP-Verwaltung (Konzept)
 
-> Stand: 06.11.2026. Entwurf, abgestimmt mit Matthias im Projekt-Thread. Gebaut wird erst nach Freigabe dieser Seite.
+> Stand: 06.11.2026. Entwurf, mit dem Projektinhaber abgestimmt. Gebaut wird erst nach Freigabe dieser Seite.
 
 ## Ziel
 
