@@ -10,7 +10,14 @@ import { createAuditLog } from './db/audit.js';
 import { createRepository, NotFoundError, ValidationError } from './db/repository.js';
 import { EventHub } from './events.js';
 import { registerAuthGuard } from './auth/guard.js';
-import { createSmtpMailer, type Mailer } from './auth/mailer.js';
+import {
+  createSmtpMailer,
+  loadMailConfig,
+  publicUrlFromEnv,
+  type MailerFactory,
+} from './auth/mailer.js';
+import { MailError, MailService } from './mail/service.js';
+import { mailRoutes } from './routes/mail.js';
 import { createOidc } from './auth/oidc.js';
 import { LoginRateLimiter } from './auth/rate-limit.js';
 import { authRoutes } from './auth/routes.js';
@@ -48,8 +55,8 @@ export async function buildApp(
     /** Ping-Prüfung (Tests ersetzen sie) und ob der Zeitplan startet */
     pinger?: Pinger;
     startScanner?: boolean;
-    /** Mailversand (Tests ersetzen ihn); sonst aus config.mail */
-    mailer?: Mailer;
+    /** Mailversand (Tests ersetzen ihn); sonst SMTP über nodemailer */
+    createMailer?: MailerFactory;
     /** Abruf der RSS-Feeds (Tests ersetzen ihn) und ob der Zeitplan startet */
     feedFetch?: typeof fetch;
     startFeeds?: boolean;
@@ -93,6 +100,11 @@ export async function buildApp(
       if (error.kind !== 'not-configured') request.log.warn({ err: error }, 'Technitium-Fehler');
       return reply.code(error.statusCode).send({ error: error.message, code: error.kind });
     }
+    if (error instanceof MailError) {
+      if (error.kind !== 'not-configured' && error.kind !== 'invalid')
+        request.log.warn({ err: error }, 'Mail-Fehler');
+      return reply.code(error.statusCode).send({ error: error.message, code: error.kind });
+    }
     if (error instanceof ProxmoxError) {
       if (error.kind !== 'not-configured') request.log.warn({ err: error }, 'Proxmox-Fehler');
       return reply.code(error.statusCode).send({ error: error.message, code: error.kind });
@@ -103,6 +115,17 @@ export async function buildApp(
     return reply.code(500).send({ error: 'Interner Serverfehler' });
   });
 
+  const audit = createAuditLog(db);
+  const mail = new MailService({
+    db,
+    audit,
+    envConfig: config.mail === undefined ? loadMailConfig() : config.mail,
+    envPublicUrl:
+      config.mail?.publicUrl ??
+      (config.publicUrl === undefined ? publicUrlFromEnv() : config.publicUrl),
+    createMailer: options.createMailer ?? createSmtpMailer,
+  });
+
   await app.register(fastifyCookie);
   registerAuthGuard(app, authStore);
   await app.register(authRoutes, {
@@ -110,13 +133,9 @@ export async function buildApp(
     store: authStore,
     limiter: new LoginRateLimiter(),
     oidc: config.oidc ? createOidc(config.oidc, authStore) : null,
-    mail: config.mail
-      ? {
-          mailer: options.mailer ?? createSmtpMailer(config.mail),
-          publicUrl: config.mail.publicUrl,
-        }
-      : null,
+    mail,
   });
+  await app.register(mailRoutes, { prefix: '/api', mail });
   await app.register(apiRoutes, { prefix: '/api', repo, events, monitor });
   await app.register(viewRoutes, { prefix: '/api', db });
   const icons =
@@ -130,7 +149,6 @@ export async function buildApp(
     });
   await app.register(iconRoutes, { prefix: '/api', icons });
   await app.register(configRoutes, { prefix: '/api', repo, events });
-  const audit = createAuditLog(db);
   const technitium = new TechnitiumService({
     db,
     audit,

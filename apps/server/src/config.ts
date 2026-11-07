@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { loadMailConfig, type MailConfig } from './auth/mailer.js';
+import { loadMailConfig, publicUrlFromEnv, type MailConfig } from './auth/mailer.js';
 import { loadOidcConfig, type OidcConfig } from './auth/oidc.js';
 import type { TechnitiumConnection } from './technitium/client.js';
 import { connectionFromEnv } from './technitium/service.js';
@@ -31,8 +31,13 @@ export interface AppConfig {
   logLevel: string;
   /** null = Anmeldung nur lokal */
   oidc: OidcConfig | null;
-  /** SMTP für „Passwort vergessen“; null oder nicht gesetzt = kein Mailversand. */
+  /**
+   * Fester Mailserver aus SMTP_HOST und Co.; null = in der Oberfläche einstellbar. Fehlt das
+   * Feld (Tests), werden die Umgebungsvariablen gelesen.
+   */
   mail?: MailConfig | null;
+  /** PUBLIC_URL für Links in Mails, auch wenn der Mailserver in der Oberfläche eingestellt ist. */
+  publicUrl?: string | null;
   /**
    * Feste Technitium-Verbindung aus TECHNITIUM_URL/TECHNITIUM_TOKEN; null = in der Oberfläche
    * einstellbar. Fehlt das Feld (Tests), werden die Umgebungsvariablen gelesen.
@@ -58,6 +63,7 @@ export function loadConfig(): AppConfig {
     logLevel: process.env.LOG_LEVEL ?? 'info',
     oidc: loadOidcConfig(),
     mail: loadMailConfig(),
+    publicUrl: publicUrlFromEnv(),
     technitium: connectionFromEnv(),
     proxmox: proxmoxFromEnv(),
   };

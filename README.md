@@ -91,23 +91,28 @@ Passwörter werden mit scrypt gespeichert, Sitzungen laufen 30 Tage und verläng
 
 Auf der Anmeldeseite gibt es _Passwort vergessen?_. Was dann passiert, hängt davon ab, ob ein Mailserver eingerichtet ist:
 
-- **Mit SMTP** (siehe unten) und hinterlegter E-Mail-Adresse bekommt der Benutzer einen Link, der eine Stunde gültig ist und nur einmal funktioniert.
-- **Ohne SMTP** oder ohne Adresse sehen die Admins die Anfrage in der Benutzerverwaltung. Dort erzeugen sie einen Reset-Link (24 Stunden gültig) und geben ihn selbst weiter, oder sie setzen direkt ein neues Passwort.
+- **Mit Mailserver** (Einstellungen › _Verbindungen_ › _Mailserver_ oder Umgebungsvariablen, siehe unten) und hinterlegter E-Mail-Adresse bekommt der Benutzer einen Link, der eine Stunde gültig ist und nur einmal funktioniert.
+- **Ohne Mailserver** oder ohne Adresse sehen die Admins die Anfrage in der Benutzerverwaltung. Dort erzeugen sie einen Reset-Link (24 Stunden gültig) und geben ihn selbst weiter, oder sie setzen direkt ein neues Passwort.
 
 Die Seite antwortet immer gleich, damit sich darüber keine Benutzernamen ausforschen lassen. Nach dem Zurücksetzen ist der Benutzer auf allen anderen Geräten abgemeldet. Die eigene E-Mail-Adresse pflegt jeder im Benutzermenü.
 
+Den Mailserver richten Admins unter Einstellungen › _Verbindungen_ › _Mailserver_ ein: Server (IP oder DNS-Name), Port, Verschlüsselung (STARTTLS, SSL/TLS oder keine), Benutzer, Passwort, Absender und die Adresse des Dashboards. Gespeichert wird nur, wenn Verbindung und Anmeldung klappen; _Testmail senden_ prüft die eingegebenen Werte vorher mit einer echten Mail. Das Passwort bleibt im Server und wird nie wieder angezeigt.
+
+Alternativ lässt sich der Mailserver fest per Umgebungsvariablen vorgeben. Ist `SMTP_HOST` gesetzt, gelten diese Werte und die Oberfläche zeigt sie nur an (wie bei Technitium und Proxmox).
+
 | Variable            | Standard            | Bedeutung                                                                   |
 | ------------------- | ------------------- | --------------------------------------------------------------------------- |
-| `SMTP_HOST`         |                     | Mailserver; ohne diesen Wert ist der Mailversand aus                        |
+| `SMTP_HOST`         |                     | Mailserver; ohne diesen Wert ist er in der Oberfläche einstellbar           |
 | `SMTP_PORT`         | `587`               | Port                                                                        |
-| `SMTP_SECURE`       | `true` bei Port 465 | Direkt per TLS verbinden; sonst STARTTLS, wenn der Server es anbietet       |
+| `SMTP_ENCRYPTION`   | siehe `SMTP_SECURE` | `starttls` (STARTTLS ist Pflicht), `tls` (direkt per TLS) oder `none`       |
+| `SMTP_SECURE`       | `true` bei Port 465 | Ohne `SMTP_ENCRYPTION`: `true` = `tls`, sonst `starttls`                    |
 | `SMTP_USER`         |                     | Benutzername am Mailserver                                                  |
 | `SMTP_PASSWORD`     |                     | Passwort dazu                                                               |
 | `SMTP_FROM`         |                     | Absender, z. B. `Ultimate Dash <dash@example.org>` (Pflicht mit SMTP)       |
 | `SMTP_TLS_INSECURE` | `false`             | Selbstsignierte Zertifikate am Mailserver akzeptieren                       |
 | `PUBLIC_URL`        |                     | Adresse des Dashboards für Links in Mails, z. B. `https://dash.example.org` |
 
-`PUBLIC_URL` ist mit SMTP Pflicht, weil Links in Mails sonst aus dem `Host`-Header gebaut würden, den ein Angreifer fälschen kann.
+`PUBLIC_URL` ist mit `SMTP_HOST` Pflicht; ist es gesetzt, gilt es auch für den in der Oberfläche eingerichteten Mailserver. Ohne Umgebungsvariable wird die Adresse im Formular hinterlegt. Fest eingestellt sein muss sie, weil Links in Mails sonst aus dem `Host`-Header gebaut würden, den ein Angreifer fälschen kann.
 
 **Einziger Admin ausgesperrt?** Einen Reset-Link auf der Kommandozeile erzeugen und im Browser öffnen:
 

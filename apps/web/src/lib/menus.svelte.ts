@@ -4,6 +4,7 @@ class MenuState {
   copyOpen = $state(false);
   technitiumOpen = $state(false);
   proxmoxOpen = $state(false);
+  mailOpen = $state(false);
   feedsOpen = $state(false);
 }
 

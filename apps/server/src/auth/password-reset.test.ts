@@ -11,7 +11,7 @@ const NEW_PASSWORD = 'ganz-neues-passwort';
 const mailConfig: MailConfig = {
   host: 'smtp.example.org',
   port: 587,
-  secure: false,
+  encryption: 'starttls',
   user: null,
   password: null,
   from: 'dash@example.org',
@@ -37,13 +37,14 @@ const mailer: Mailer = {
   async send(message) {
     sent.push(message);
   },
+  async verify() {},
 };
 
 async function start(withMail: boolean) {
   sent = [];
   ctx = await buildApp(
     { ...baseConfig, mail: withMail ? mailConfig : null },
-    { logger: false, startMonitor: false, mailer },
+    { logger: false, startMonitor: false, createMailer: () => mailer },
   );
   const setup = await ctx.app.inject({
     method: 'POST',

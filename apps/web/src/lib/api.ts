@@ -67,6 +67,10 @@ import type {
   TechnitiumSettings,
   TechnitiumSettingsInput,
   TechnitiumTestResult,
+  MailSettings,
+  MailSettingsInput,
+  MailTestInput,
+  MailTestResult,
   ProxmoxSettings,
   ProxmoxSettingsInput,
   ProxmoxSummary,
@@ -153,6 +157,11 @@ export const api = {
   deleteService: (id: number) => request<void>('DELETE', `/services/${id}`),
   arrangeServices: (groupId: number, ids: number[]) =>
     request<void>('PUT', '/services/arrange', { groupId, ids }),
+
+  mailSettings: () => request<MailSettings>('GET', '/mail/settings'),
+  saveMail: (input: MailSettingsInput) => request<MailSettings>('PUT', '/mail/settings', input),
+  testMail: (input: MailTestInput) => request<MailTestResult>('POST', '/mail/test', input),
+  disconnectMail: () => request<void>('DELETE', '/mail/settings'),
 
   proxmoxSettings: () => request<ProxmoxSettings>('GET', '/proxmox/settings'),
   saveProxmox: (input: ProxmoxSettingsInput) =>
