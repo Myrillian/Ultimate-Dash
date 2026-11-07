@@ -71,7 +71,11 @@ export class IpamSyncService {
         ipv4ToInt(router)! < cidr.last;
 
       if (same) {
-        if (routerInside && same.gateway !== router)
+        if (
+          routerInside &&
+          same.gateway !== router &&
+          !result.drift.some((d) => d.networkId === same.id && d.remote === router)
+        )
           result.drift.push({
             networkId: same.id,
             networkName: same.name,
@@ -96,6 +100,15 @@ export class IpamSyncService {
           start: x.s === ipv4ToInt(x.p.start) ? x.p.start : intToString(x.s),
           end: x.e === ipv4ToInt(x.p.end) ? x.p.end : intToString(x.e),
         }));
+      // Bedienen zwei Server dasselbe Netz (geteilter Scope), wird daraus ein Vorschlag.
+      const twin = result.suggestions.find((x) => x.cidr === cidrToString(cidr));
+      if (twin) {
+        for (const pool of pools)
+          if (!twin.pools.some((p) => p.start === pool.start && p.end === pool.end))
+            twin.pools.push(pool);
+        twin.pools.sort((a, b) => ipv4ToInt(a.start)! - ipv4ToInt(b.start)!);
+        continue;
+      }
       result.suggestions.push({
         scope: scope.name,
         cidr: cidrToString(cidr),

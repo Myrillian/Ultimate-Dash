@@ -123,7 +123,7 @@ export async function buildApp(
     audit,
     envConnection: config.technitium === undefined ? connectionFromEnv() : config.technitium,
   });
-  const dhcp = new DhcpService(technitium);
+  const dhcp = new DhcpService(technitium, db);
   await app.register(technitiumRoutes, { prefix: '/api', technitium, dhcp, audit });
   const ipam = new IpamRepository(db, audit);
   const ipamHosts = new IpamHostStore(db, audit);

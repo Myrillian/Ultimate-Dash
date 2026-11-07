@@ -108,9 +108,23 @@ export class TechnitiumService {
     return connection;
   }
 
-  /** Für DhcpService: ruft einen Technitium-Endpunkt mit der gespeicherten Verbindung auf. */
+  /** Ruft einen Technitium-Endpunkt mit der gespeicherten Verbindung auf. */
   call<T>(path: string, params?: Record<string, string | number | boolean>) {
     return callTechnitium<T>(this.connection(), path, params, this.options.timeoutMs);
+  }
+
+  /** Für DhcpService: ruft einen Endpunkt auf einem bestimmten Server auf (z. B. zweiter Knoten). */
+  callWith<T>(
+    connection: TechnitiumConnection,
+    path: string,
+    params?: Record<string, string | number | boolean>,
+  ) {
+    return callTechnitium<T>(connection, path, params, this.options.timeoutMs);
+  }
+
+  /** Hauptverbindung; wirft „nicht verbunden“, wenn keine eingerichtet ist. */
+  mainConnection(): TechnitiumConnection {
+    return this.connection();
   }
 
   get configured(): boolean {

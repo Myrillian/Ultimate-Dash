@@ -48,6 +48,8 @@ import type {
   DhcpReservationUpdate,
   DhcpScope,
   DhcpScopeState,
+  DhcpServer,
+  DhcpServerInput,
   DnsRecordCreate,
   DnsRecordDelete,
   DnsRecordList,
@@ -158,6 +160,13 @@ export const api = {
   updateDnsRecord: (input: DnsRecordUpdate) => request<void>('PUT', '/technitium/records', input),
   deleteDnsRecord: (input: DnsRecordDelete) =>
     request<void>('POST', '/technitium/records/delete', input),
+  dhcpServers: () => request<DhcpServer[]>('GET', '/technitium/dhcp/servers'),
+  addDhcpServer: (input: DhcpServerInput) =>
+    request<DhcpServer>('POST', '/technitium/dhcp/servers', input),
+  updateDhcpServer: (id: string, input: DhcpServerInput) =>
+    request<DhcpServer>('PUT', `/technitium/dhcp/servers/${encodeURIComponent(id)}`, input),
+  deleteDhcpServer: (id: string) =>
+    request<void>('DELETE', `/technitium/dhcp/servers/${encodeURIComponent(id)}`),
   dhcpScopes: () => request<DhcpScope[]>('GET', '/technitium/dhcp/scopes'),
   dhcpLeases: () => request<DhcpLease[]>('GET', '/technitium/dhcp/leases'),
   setDhcpScope: (input: DhcpScopeState) =>

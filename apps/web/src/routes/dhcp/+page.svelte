@@ -1,30 +1,40 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { DhcpLease, DhcpReservation, DhcpScope } from '@ultimate-dash/shared';
-  import { ipv4PoolSize, ipv4ToInt } from '@ultimate-dash/shared';
+  import type { DhcpLease, DhcpReservation, DhcpScope, DhcpServer } from '@ultimate-dash/shared';
+  import {
+    dhcpScopeKey,
+    ipv4PoolSize,
+    ipv4ToInt,
+    multipleDhcpServers,
+    parseDhcpScopeKey,
+  } from '@ultimate-dash/shared';
   import { api, ApiError } from '$lib/api';
   import { auth } from '$lib/auth.svelte';
-  import { formatDuration } from '$lib/format';
+  import { formatDuration, formatLeaseTime } from '$lib/format';
   import { theme } from '$lib/theme.svelte';
   import { toasts } from '$lib/toasts.svelte';
   import { matchesAll, tokensOf } from '$lib/list-filter';
   import { vendors } from '$lib/vendors.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import DhcpServersDialog from '$lib/components/DhcpServersDialog.svelte';
   import ReservationForm, { type ReservationValues } from '$lib/components/ReservationForm.svelte';
   import TechNav from '$lib/components/TechNav.svelte';
   import UiIcon from '$lib/components/UiIcon.svelte';
   import UserMenu from '$lib/components/UserMenu.svelte';
 
-  type Reservation = DhcpReservation & { scope: string };
+  type Reservation = DhcpReservation & { scope: string; server: string; serverName: string };
 
   let scopes = $state<DhcpScope[]>([]);
   let leases = $state<DhcpLease[]>([]);
+  let servers = $state<DhcpServer[]>([]);
+  let serversOpen = $state(false);
   let loaded = $state(false);
   let notConfigured = $state(false);
   let error = $state<string | null>(null);
   let refreshing = $state(false);
 
   let tab = $state<'leases' | 'reservations'>('leases');
+  /** Schlüssel aus Server und Scope, siehe `dhcpScopeKey`; leer = alle */
   let scopeFilter = $state('');
   let query = $state('');
 
@@ -41,22 +51,24 @@
     action: () => Promise<void>;
   }>({ open: false, title: '', message: '', label: 'Löschen', action: async () => {} });
 
-  const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' });
-
-  /** Technitium liefert „MM/dd/yyyy HH:mm:ss“; unlesbare Werte bleiben unverändert stehen. */
-  function formatTime(value: string | null): string {
-    if (!value) return '–';
-    const m = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})$/.exec(value);
-    if (!m) return value;
-    return dateFormat.format(new Date(+m[3]!, +m[1]! - 1, +m[2]!, +m[4]!, +m[5]!, +m[6]!));
-  }
-
   const byAddress = (a: { address: string }, b: { address: string }) =>
     (ipv4ToInt(a.address) ?? 0) - (ipv4ToInt(b.address) ?? 0);
 
   const reservations = $derived<Reservation[]>(
-    scopes.flatMap((s) => s.reservations.map((r) => ({ ...r, scope: s.name }))),
+    scopes.flatMap((s) =>
+      s.reservations.map((r) => ({
+        ...r,
+        scope: s.name,
+        server: s.server,
+        serverName: s.serverName,
+      })),
+    ),
   );
+  /** Mehrere Technitium-Server: dann wird überall angezeigt, von welchem ein Eintrag stammt. */
+  const multi = $derived(multipleDhcpServers(scopes) || servers.length > 1);
+  const failed = $derived(servers.filter((s) => s.error));
+  const inScope = (entry: { server: string; scope: string }) =>
+    !scopeFilter || dhcpScopeKey({ server: entry.server, name: entry.scope }) === scopeFilter;
   // Alle Suchbegriffe müssen vorkommen; Hersteller, Scope und Art zählen mit.
   const matches = (parts: (string | null)[]) =>
     matchesAll(parts.filter(Boolean).join(' ').toLocaleLowerCase('de'), tokensOf(query));
@@ -70,8 +82,9 @@
     leases
       .filter(
         (l) =>
-          (!scopeFilter || l.scope === scopeFilter) &&
+          inScope(l) &&
           matches([
+            l.serverName,
             l.address,
             l.hostName,
             l.hardwareAddress,
@@ -86,8 +99,9 @@
     reservations
       .filter(
         (r) =>
-          (!scopeFilter || r.scope === scopeFilter) &&
+          inScope(r) &&
           matches([
+            r.serverName,
             r.address,
             r.hostName,
             r.hardwareAddress,
@@ -102,7 +116,9 @@
   /** Belegung eines Scopes: dynamische Leases im Verhältnis zu den verteilbaren Adressen. */
   function usage(scope: DhcpScope) {
     const pool = ipv4PoolSize(scope.startingAddress, scope.endingAddress, scope.exclusions);
-    const dynamic = leases.filter((l) => l.scope === scope.name && l.type === 'Dynamic').length;
+    const dynamic = leases.filter(
+      (l) => l.server === scope.server && l.scope === scope.name && l.type === 'Dynamic',
+    ).length;
     return { pool, dynamic, share: pool > 0 ? Math.min(1, dynamic / pool) : 0 };
   }
 
@@ -112,6 +128,8 @@
       [scopes, leases] = await Promise.all([api.dhcpScopes(), api.dhcpLeases()]);
       error = null;
       notConfigured = false;
+      // Erst nach dem Abruf, damit Fehler weiterer Server aktuell sind.
+      servers = await api.dhcpServers().catch(() => servers);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'not-configured') notConfigured = true;
       else error = e instanceof Error ? e.message : 'DHCP-Daten konnten nicht geladen werden';
@@ -134,7 +152,7 @@
 
   const toggleScope = (scope: DhcpScope) =>
     perform(
-      () => api.setDhcpScope({ scope: scope.name, enabled: !scope.enabled }),
+      () => api.setDhcpScope({ server: scope.server, scope: scope.name, enabled: !scope.enabled }),
       `${scope.name} ${scope.enabled ? 'deaktiviert' : 'aktiviert'}`,
     );
 
@@ -163,6 +181,7 @@
     perform(
       () =>
         api.dhcpLeaseAction({
+          server: l.server,
           scope: l.scope,
           hardwareAddress: l.hardwareAddress,
           action: 'reserve',
@@ -179,6 +198,7 @@
       l.type === 'Reserved' ? 'Aufheben' : 'Freigeben',
       () =>
         api.dhcpLeaseAction({
+          server: l.server,
           scope: l.scope,
           hardwareAddress: l.hardwareAddress,
           action: l.type === 'Reserved' ? 'unreserve' : 'remove',
@@ -193,6 +213,7 @@
       'Löschen',
       () =>
         api.dhcpLeaseAction({
+          server: l.server,
           scope: l.scope,
           hardwareAddress: l.hardwareAddress,
           action: 'remove',
@@ -205,13 +226,18 @@
       'Reservierung löschen?',
       `${r.address}${r.hostName ? ` (${r.hostName})` : ''} für ${r.hardwareAddress} wird gelöscht.`,
       'Löschen',
-      () => api.deleteDhcpReservation({ scope: r.scope, hardwareAddress: r.hardwareAddress }),
+      () =>
+        api.deleteDhcpReservation({
+          server: r.server,
+          scope: r.scope,
+          hardwareAddress: r.hardwareAddress,
+        }),
       'Reservierung gelöscht',
     );
 
   async function saveReservation(values: ReservationValues) {
     const input = {
-      scope: values.scope,
+      ...parseDhcpScopeKey(values.scope),
       hardwareAddress: values.hardwareAddress,
       ipAddress: values.ipAddress.trim(),
       hostName: values.hostName,
@@ -240,6 +266,17 @@
     </h1>
     <TechNav />
     <div class="ml-auto flex items-center gap-1">
+      {#if auth.isAdmin && !notConfigured}
+        <button
+          type="button"
+          class="icon-btn"
+          aria-label="DHCP-Server verwalten"
+          title="DHCP-Server verwalten"
+          onclick={() => (serversOpen = true)}
+        >
+          <UiIcon name="settings" size={16} />
+        </button>
+      {/if}
       <button
         type="button"
         class="icon-btn"
@@ -288,10 +325,16 @@
     {#if error}
       <p class="text-xs text-down" role="status">Aktualisierung fehlgeschlagen: {error}</p>
     {/if}
+    {#each failed as server (server.id)}
+      <p class="rounded-lg border border-down/40 px-3 py-2 text-sm" role="status">
+        <span class="font-medium text-down">{server.name} nicht erreichbar:</span>
+        {server.error} Seine Scopes und Leases fehlen in der Übersicht.
+      </p>
+    {/each}
 
     <!-- Scopes -->
     <section aria-label="Scopes" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {#each scopes as scope (scope.name)}
+      {#each scopes as scope (dhcpScopeKey(scope))}
         {@const u = usage(scope)}
         <article
           class="grid content-start gap-3 rounded-2xl border border-line bg-elevated p-4"
@@ -300,6 +343,11 @@
           <div class="flex items-start gap-2">
             <div class="min-w-0 flex-1">
               <h2 class="truncate font-semibold">{scope.name}</h2>
+              {#if multi}
+                <p class="flex items-center gap-1 text-xs text-fg-muted">
+                  <UiIcon name="server" size={12} />{scope.serverName}
+                </p>
+              {/if}
               <p class="font-mono text-xs text-fg-muted">
                 {scope.startingAddress} – {scope.endingAddress}
               </p>
@@ -408,7 +456,9 @@
         <label class="sr-only" for="dhcp-scope">Scope</label>
         <select id="dhcp-scope" class="input w-auto py-1.5" bind:value={scopeFilter}>
           <option value="">Alle Scopes</option>
-          {#each scopes as s (s.name)}<option value={s.name}>{s.name}</option>{/each}
+          {#each scopes as s (dhcpScopeKey(s))}<option value={dhcpScopeKey(s)}
+              >{s.name}{multi ? ` · ${s.serverName}` : ''}</option
+            >{/each}
         </select>
         <label class="sr-only" for="dhcp-search">Suchen</label>
         <input
@@ -445,12 +495,13 @@
                 <th class="px-2 py-2 font-medium">MAC</th>
                 <th class="px-2 py-2 font-medium">Art</th>
                 <th class="px-2 py-2 font-medium">Scope</th>
+                {#if multi}<th class="px-2 py-2 font-medium">Server</th>{/if}
                 <th class="px-2 py-2 font-medium">Läuft ab</th>
                 <th class="w-24 px-2 py-2"><span class="sr-only">Aktionen</span></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-line">
-              {#each leaseRows as lease (lease.scope + lease.hardwareAddress)}
+              {#each leaseRows as lease (`${lease.server}/${lease.scope}/${lease.hardwareAddress}`)}
                 <tr>
                   <td class="px-4 py-2 font-mono text-[13px]">{lease.address}</td>
                   <td class="max-w-48 truncate px-2 py-2" title={lease.hostName ?? ''}
@@ -472,8 +523,9 @@
                     >
                   </td>
                   <td class="px-2 py-2 text-fg-muted">{lease.scope}</td>
+                  {#if multi}<td class="px-2 py-2 text-fg-muted">{lease.serverName}</td>{/if}
                   <td class="px-2 py-2 text-xs whitespace-nowrap text-fg-muted"
-                    >{formatTime(lease.expires)}</td
+                    >{formatLeaseTime(lease.expires)}</td
                   >
                   <td class="px-2 py-1 text-right whitespace-nowrap">
                     {#if auth.isAdmin}
@@ -515,7 +567,7 @@
                 </tr>
               {:else}
                 <tr>
-                  <td colspan="7" class="px-4 py-10 text-center text-fg-muted">
+                  <td colspan={multi ? 8 : 7} class="px-4 py-10 text-center text-fg-muted">
                     {leases.length === 0 ? 'Es gibt noch keine Leases.' : 'Keine Leases gefunden.'}
                   </td>
                 </tr>
@@ -532,11 +584,12 @@
                 <th class="px-2 py-2 font-medium">MAC</th>
                 <th class="px-2 py-2 font-medium">Kommentar</th>
                 <th class="px-2 py-2 font-medium">Scope</th>
+                {#if multi}<th class="px-2 py-2 font-medium">Server</th>{/if}
                 <th class="w-20 px-2 py-2"><span class="sr-only">Aktionen</span></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-line">
-              {#each reservationRows as r (r.scope + r.hardwareAddress)}
+              {#each reservationRows as r (`${r.server}/${r.scope}/${r.hardwareAddress}`)}
                 <tr>
                   <td class="px-4 py-2 font-mono text-[13px]">{r.address}</td>
                   <td class="max-w-48 truncate px-2 py-2" title={r.hostName ?? ''}
@@ -552,6 +605,7 @@
                     >{r.comments ?? ''}</td
                   >
                   <td class="px-2 py-2 text-fg-muted">{r.scope}</td>
+                  {#if multi}<td class="px-2 py-2 text-fg-muted">{r.serverName}</td>{/if}
                   <td class="px-2 py-1 text-right whitespace-nowrap">
                     {#if auth.isAdmin}
                       <button
@@ -575,7 +629,7 @@
                 </tr>
               {:else}
                 <tr>
-                  <td colspan="6" class="px-4 py-10 text-center text-fg-muted">
+                  <td colspan={multi ? 7 : 6} class="px-4 py-10 text-center text-fg-muted">
                     {reservations.length === 0
                       ? 'Es gibt noch keine Reservierungen.'
                       : 'Keine Reservierungen gefunden.'}
@@ -600,6 +654,11 @@
   initial={form.initial}
   onclose={() => (form.open = false)}
   onsubmit={saveReservation}
+/>
+<DhcpServersDialog
+  open={serversOpen}
+  onclose={() => (serversOpen = false)}
+  onchange={() => load()}
 />
 <ConfirmDialog
   open={confirm.open}
