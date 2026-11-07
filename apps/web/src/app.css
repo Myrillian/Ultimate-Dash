@@ -117,6 +117,15 @@ dialog::backdrop {
 }
 
 @layer components {
+  /* Seitenrahmen: nutzt die volle Breite, Ränder wachsen nur leicht mit dem Bildschirm. */
+  .page {
+    @apply flex min-h-dvh w-full min-w-0 flex-col gap-6 px-3 py-4 sm:px-5 sm:py-6 xl:px-8;
+  }
+  /* Gruppenraster: so viele Spalten, wie in die Breite passen, auf dem Smartphone eine. */
+  .group-grid {
+    @apply grid gap-x-5;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  }
   .btn {
     @apply inline-flex items-center justify-center gap-1.5 rounded-lg border border-line bg-elevated px-3 py-2 text-sm font-medium
       transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50;

@@ -29,11 +29,13 @@
   interface Props {
     id: string;
     value: string;
-    /** Name des Services: Vorschlag für die Suche und Initialen in der Vorschau. */
+    /** Name des Services oder der Gruppe: Vorschlag für die Suche und Initialen in der Vorschau. */
     name: string;
+    /** Suche beim Öffnen mit dem Namen vorbelegen (passt bei Services, selten bei Gruppen). */
+    prefill?: boolean;
   }
 
-  let { id, value = $bindable(), name }: Props = $props();
+  let { id, value = $bindable(), name, prefill = true }: Props = $props();
 
   const PAGE = 120;
   let open = $state(false);
@@ -69,7 +71,7 @@
   function show() {
     open = true;
     // Ohne Icon mit dem Service-Namen vorbelegen: meist ist das passende Icon gleich dabei.
-    if (!value.trim() && !query) query = name.trim();
+    if (prefill && !value.trim() && !query) query = name.trim();
     loadError = null;
     loadCatalog()
       .then((result) => (catalog = result))

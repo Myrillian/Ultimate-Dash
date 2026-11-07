@@ -2,6 +2,8 @@
   import type { Group, GroupInput } from '@ultimate-dash/shared';
   import { ApiError } from '$lib/api';
   import Dialog from './Dialog.svelte';
+  import IconPicker from './IconPicker.svelte';
+  import ServiceIcon from './ServiceIcon.svelte';
 
   interface Props {
     open: boolean;
@@ -43,26 +45,31 @@
   }
 </script>
 
-<Dialog {open} {onclose} size="sm" title={group ? 'Gruppe bearbeiten' : 'Gruppe anlegen'}>
+<Dialog {open} {onclose} title={group ? 'Gruppe bearbeiten' : 'Gruppe anlegen'}>
   <form id="group-form" class="grid gap-4" onsubmit={submit} novalidate>
-    <div>
-      <label class="field-label" for="grp-name">Name</label>
-      <input
-        id="grp-name"
-        class="input"
-        bind:value={name}
-        required
-        maxlength="80"
-        placeholder="z. B. Infrastruktur"
-        aria-invalid={!!error}
-      />
-      {#if error}<p class="field-error" role="alert">{error}</p>{/if}
+    <div class="flex items-start gap-3">
+      <div class="pt-6">
+        <ServiceIcon icon={icon || null} name={name || '?'} size={44} />
+      </div>
+      <div class="flex-1">
+        <label class="field-label" for="grp-name">Name</label>
+        <input
+          id="grp-name"
+          class="input"
+          bind:value={name}
+          required
+          maxlength="80"
+          placeholder="z. B. Infrastruktur"
+          aria-invalid={!!error}
+        />
+        {#if error}<p class="field-error" role="alert">{error}</p>{/if}
+      </div>
     </div>
     <div>
       <label class="field-label" for="grp-icon"
         >Icon <span class="text-fg-muted">(optional)</span></label
       >
-      <input id="grp-icon" class="input" bind:value={icon} placeholder="mdi:server" />
+      <IconPicker id="grp-icon" bind:value={icon} {name} prefill={false} />
     </div>
   </form>
   {#snippet footer()}

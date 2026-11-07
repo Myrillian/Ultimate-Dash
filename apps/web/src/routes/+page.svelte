@@ -183,11 +183,11 @@
 
 <svelte:window onkeydown={onGlobalKeydown} />
 
-<div class="mx-auto flex min-h-dvh max-w-[1600px] flex-col gap-8 px-4 py-6 sm:px-6 lg:px-10">
+<div class="page gap-6 sm:gap-8">
   <header class="flex flex-wrap items-center gap-3">
-    <div class="flex items-center gap-2.5">
-      <img src="/favicon.svg" alt="" width="32" height="32" />
-      <h1 class="text-xl font-semibold tracking-tight">
+    <div class="flex min-w-0 items-center gap-2.5">
+      <img src="/favicon.svg" alt="" width="32" height="32" class="size-7 sm:size-8" />
+      <h1 class="truncate text-lg font-semibold tracking-tight sm:text-xl">
         {dashboard.data?.title ?? 'Ultimate Dash'}
       </h1>
     </div>
@@ -227,15 +227,16 @@
         class="btn ml-1"
         class:btn-primary={editMode}
         aria-pressed={editMode}
+        aria-label={editMode ? 'Fertig' : 'Bearbeiten'}
         onclick={() => (editModeRequested = !editModeRequested)}
       >
         <UiIcon name={editMode ? 'check' : 'pencil'} size={16} />
-        {editMode ? 'Fertig' : 'Bearbeiten'}
+        <span class="hidden sm:inline">{editMode ? 'Fertig' : 'Bearbeiten'}</span>
       </button>
     </div>
   </header>
 
-  <main class="grid flex-1 content-start gap-8">
+  <main class="grid min-w-0 flex-1 content-start gap-6 sm:gap-8">
     {#if dashboard.data && !searching}
       <DnsPanel onconnect={() => (menus.technitiumOpen = true)} />
     {/if}
@@ -313,7 +314,7 @@
       </div>
     {:else}
       <div
-        class="grid gap-x-6 gap-y-8 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+        class="group-grid gap-y-6 sm:gap-y-8"
         aria-label="Gruppen"
         use:dragHandleZone={{
           items: groupItems,
@@ -369,7 +370,7 @@
         {/each}
       </div>
       {#if editMode}
-        <div class="mt-8 grid gap-x-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <div class="group-grid mt-8">
           <button
             type="button"
             class="flex min-h-32 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line text-fg-muted transition hover:border-accent hover:text-accent"

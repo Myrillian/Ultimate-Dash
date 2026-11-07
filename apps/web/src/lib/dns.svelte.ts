@@ -15,9 +15,27 @@ function storedRange(): StatsRange {
   return 'day';
 }
 
+const VIEW_KEY = 'ud-dns-view';
+
+/** Größe des DNS-Bereichs: Balken mit Kurzstatistik, kompakt (Kennzahlen + Verlauf) oder voll. */
+export type DnsView = 'bar' | 'compact' | 'full';
+
+function storedView(): DnsView {
+  try {
+    const value = localStorage.getItem(VIEW_KEY);
+    if (value === 'bar' || value === 'compact' || value === 'full') return value;
+  } catch {
+    // Speicher nicht verfügbar: Standard verwenden.
+  }
+  return 'full';
+}
+
 /** DNS-Statistik aus Technitium; lädt regelmäßig nach, solange die Seite sichtbar ist. */
 class DnsState {
   range = $state<StatsRange>(storedRange());
+  view = $state<DnsView>(storedView());
+  /** Zuletzt aufgeklappte Größe, damit „Ausklappen“ dorthin zurückkehrt. */
+  lastOpen = $state<Exclude<DnsView, 'bar'>>(this.view === 'bar' ? 'full' : this.view);
   summary = $state<DnsSummary | null>(null);
   /** not-configured = noch keine Verbindung eingerichtet */
   status = $state<'idle' | 'loading' | 'ready' | 'not-configured' | 'error'>('idle');
@@ -34,6 +52,16 @@ class DnsState {
       // ignorieren
     }
     void this.load();
+  }
+
+  setView(view: DnsView) {
+    if (view !== 'bar') this.lastOpen = view;
+    this.view = view;
+    try {
+      localStorage.setItem(VIEW_KEY, view);
+    } catch {
+      // ignorieren
+    }
   }
 
   async load() {

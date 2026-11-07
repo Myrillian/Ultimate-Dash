@@ -298,12 +298,7 @@
   </div>
 {/snippet}
 
-<div
-  class="mx-auto flex min-h-dvh max-w-[1600px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10 {panelAddress &&
-  network
-    ? 'sm:pr-[27rem] lg:pr-[27rem]'
-    : ''}"
->
+<div class="page {panelAddress && network ? 'sm:pr-[27rem] lg:pr-[27rem]' : ''}">
   <header class="flex flex-wrap items-center gap-3">
     <a href="/" class="icon-btn" aria-label="Zurück zum Dashboard"><UiIcon name="back" /></a>
     <h1 class="flex items-center gap-2 text-xl font-semibold tracking-tight">
