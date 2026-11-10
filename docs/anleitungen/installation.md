@@ -98,9 +98,11 @@ Das Menü bietet genau diese Punkte:
 | 5   | update ultimate dash  | Legt zuerst ein Backup an, holt den neuesten Stand, baut neu und startet den Dienst. Schlägt das Bauen fehl, wird der alte Stand wiederhergestellt. Migrationen laufen beim Start.               |
 | 6   | create local backup   | Sichert Datenbank (konsistent per SQLite-Backup, auch bei laufendem Dienst), Datenordner und `ultimate-dash.env` als `.tar.gz`.                                                                   |
 | 7   | restore local backup  | Zeigt die vorhandenen Backups zur Auswahl, sichert den aktuellen Stand als `vor-restore-…`, stoppt den Dienst, spielt das Backup ein und startet neu.                                              |
-| 8   | exit                  | Beendet das Skript.                                                                                                                                                                                |
+| 8   | restart services      | Lädt die systemd-Konfiguration neu, startet `ultimate-dash.service` neu und prüft, ob das Dashboard antwortet. |
+| 9   | uninstall ultimate dash | Fragt nach, bietet vorher ein Backup an, entfernt Dienst und Programmordner. Daten, Konfiguration und Backups bleiben, bis du `loeschen` eintippst. Node.js und Systempakete bleiben installiert. |
+| 10  | exit                  | Beendet das Skript. |
 
-Ohne Menü, z. B. für Automatisierung: `sudo ./install.sh <deps|install|repair|update-deps|update|backup|restore>`. Mit `UD_ASSUME_YES=1` werden Rückfragen mit „ja“ beantwortet.
+Ohne Menü, z. B. für Automatisierung: `sudo ./install.sh <deps|install|repair|update-deps|update|backup|restore|restart|uninstall>`. Mit `UD_ASSUME_YES=1` werden Rückfragen mit „ja“ beantwortet; `UD_PURGE=1` löscht bei `uninstall` zusätzlich Daten, Konfiguration und Benutzer.
 
 ### Orte
 
