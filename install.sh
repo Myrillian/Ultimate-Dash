@@ -14,6 +14,7 @@
 #   UD_BACKUP_DIR Backup-Ordner        (Standard: /var/backups/ultimate-dash)
 #   UD_PORT       Port bei Neuinstallation (Standard: 3000)
 #   UD_ASSUME_YES=1  Rückfragen automatisch mit „ja“ beantworten (für Automatisierung)
+#   UD_PURGE=1       Bei „uninstall“ auch Daten, Konfiguration und Benutzer löschen
 set -Eeuo pipefail
 
 REPO_URL="${UD_REPO_URL:-https://github.com/myrillian/ultimate-dash.git}"
@@ -674,6 +675,75 @@ cmd_repair() {
 }
 
 # ---------------------------------------------------------------------------
+# 8: Dienste neu starten
+# ---------------------------------------------------------------------------
+cmd_restart() {
+  service_exists || die "Der Dienst $SERVICE_NAME ist nicht eingerichtet (Menüpunkt 2)."
+  info "Starte $SERVICE_NAME neu"
+  systemctl daemon-reload
+  systemctl enable "$SERVICE_NAME" >/dev/null 2>&1 || true
+  systemctl restart "$SERVICE_NAME"
+  if health_check 40; then
+    ok "Dienst läuft und antwortet auf Port $(app_port)"
+  else
+    err "Der Dienst antwortet nicht. Log: journalctl -u $SERVICE_NAME -n 50 --no-pager"
+    return 1
+  fi
+  systemctl --no-pager --lines=0 status "$SERVICE_NAME" || true
+}
+
+# ---------------------------------------------------------------------------
+# 9: Deinstallieren
+# ---------------------------------------------------------------------------
+cmd_uninstall() {
+  if ! app_installed && ! service_exists && [[ ! -d "$DATA_DIR" ]]; then
+    warn "Ultimate Dash ist nicht installiert."
+    return 0
+  fi
+  warn "Entfernt Dienst und Programm ($APP_DIR). Daten, Konfiguration und Backups bleiben standardmäßig erhalten."
+  confirm "Ultimate Dash wirklich deinstallieren?" n || {
+    info "Abgebrochen."
+    return 0
+  }
+  if [[ -f "$DATA_DIR/$DB_NAME" ]] && confirm "Vorher ein Backup anlegen?" j; then
+    create_backup vor-uninstall
+  fi
+
+  if service_exists; then
+    info "Entferne systemd-Dienst"
+    systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true
+    rm -f "$SERVICE_FILE"
+    systemctl daemon-reload
+    systemctl reset-failed "$SERVICE_NAME" >/dev/null 2>&1 || true
+  fi
+  if [[ -d "$APP_DIR" ]]; then
+    info "Entferne Programmordner $APP_DIR"
+    rm -rf "$APP_DIR"
+  fi
+  git config --global --unset-all safe.directory "$APP_DIR" 2>/dev/null || true
+
+  # Daten nur nach ausdrücklicher Eingabe löschen (UD_PURGE=1 für Automatisierung).
+  local purge=0
+  if [[ "${UD_PURGE:-0}" == "1" ]]; then
+    purge=1
+  elif [[ -d "$DATA_DIR" || -d "$CONF_DIR" ]]; then
+    warn "Daten ($DATA_DIR) und Konfiguration ($CONF_DIR) enthalten Datenbank und Zugangsdaten."
+    [[ "$(ask "Zum endgültigen Löschen 'loeschen' eingeben, sonst Enter" '')" == "loeschen" ]] && purge=1
+  fi
+  if ((purge)); then
+    rm -rf "$DATA_DIR" "$CONF_DIR"
+    ok "Daten und Konfiguration gelöscht"
+    if id "$SERVICE_USER" >/dev/null 2>&1; then
+      userdel "$SERVICE_USER" 2>/dev/null && ok "Benutzer $SERVICE_USER entfernt" || true
+    fi
+  else
+    ok "Daten ($DATA_DIR) und Konfiguration ($CONF_DIR) bleiben erhalten"
+  fi
+  ok "Ultimate Dash ist deinstalliert. Backups liegen weiterhin in $BACKUP_DIR."
+  info "Node.js, pnpm und Systempakete bleiben installiert (können andere Programme nutzen)."
+}
+
+# ---------------------------------------------------------------------------
 # Menü
 # ---------------------------------------------------------------------------
 status_line() {
@@ -711,7 +781,9 @@ menu() {
   5) update ultimate dash
   6) create local backup
   7) restore local backup
-  8) exit
+  8) restart services
+  9) uninstall ultimate dash
+  10) exit
 
 EOF
     choice="$(ask 'Auswahl' '')"
@@ -723,7 +795,9 @@ EOF
       5) run_action cmd_update ;;
       6) run_action cmd_backup ;;
       7) run_action cmd_restore ;;
-      8 | q | exit) exit 0 ;;
+      8) run_action cmd_restart ;;
+      9) run_action cmd_uninstall ;;
+      10 | 0 | q | exit) exit 0 ;;
       '') [[ -n "$TTY_IN" ]] || die "Kein Terminal für das Menü. Aufruf mit Unterbefehl, z. B.: $0 install" ;;
       *) warn "Ungültige Auswahl: $choice" ;;
     esac
@@ -733,7 +807,7 @@ EOF
 
 usage() {
   cat <<EOF
-Aufruf: sudo $0 [deps|install|repair|update-deps|update|backup|restore]
+Aufruf: sudo $0 [deps|install|repair|update-deps|update|backup|restore|restart|uninstall]
 Ohne Argument startet das interaktive Menü.
 EOF
 }
@@ -757,6 +831,8 @@ main() {
     update) cmd_update ;;
     backup) cmd_backup ;;
     restore) cmd_restore ;;
+    restart) cmd_restart ;;
+    uninstall) cmd_uninstall ;;
     *)
       usage
       exit 2
