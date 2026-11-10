@@ -12,6 +12,8 @@ cd ultimate-dash
 docker compose up -d --build
 ```
 
+Ohne Docker auf einem Ubuntu- oder Debian-Host: `sudo ./install.sh` startet ein Menü für Installation, Reparatur, Updates und Backups (siehe [Installation](docs/anleitungen/installation.md#alternative-installationsskript-ohne-docker-ubuntudebian)).
+
 Danach `http://<IP des Hosts>:3000` öffnen und das erste Administrator-Konto anlegen. Technitium, Proxmox und den Mailserver richtest du anschließend unter **Einstellungen › Verbindungen** ein.
 
 ## Anleitungen

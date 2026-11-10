@@ -76,6 +76,49 @@ Zum Wiederherstellen den Container stoppen, den Ordner `data` (und `.env`) aus d
 
 Zusätzlich lässt sich jedes Dashboard unter Einstellungen › _Backup_ als YAML exportieren. Das enthält nur Gruppen und Services, keine Benutzer, IPAM-Daten oder Zugangsdaten.
 
+## Alternative: Installationsskript ohne Docker (Ubuntu/Debian)
+
+Auf einem leeren Ubuntu- oder Debian-Host übernimmt `install.sh` die komplette Einrichtung: Systempakete, Node.js 22, pnpm, Systembenutzer, Bauen, systemd-Dienst, Backups. Es braucht root-Rechte und systemd.
+
+```bash
+sudo apt-get update && sudo apt-get install -y git
+git clone https://github.com/myrillian/ultimate-dash.git
+cd ultimate-dash
+sudo ./install.sh
+```
+
+Das Menü bietet genau diese Punkte:
+
+| Nr. | Punkt                 | Was passiert                                                                                                                                                                                      |
+| --- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | install dependencies  | Installiert `git`, Build-Werkzeuge (für `better-sqlite3`), `iputils-ping`, `sqlite3`, Node.js 22 (NodeSource) und pnpm (corepack). Mehrfaches Ausführen schadet nicht.                              |
+| 2   | install ultimate dash | Führt Punkt 1 aus, legt den Benutzer `ultimate-dash` und die Ordner an, fragt Port und `PUBLIC_URL`, klont das Repository, baut es, richtet den Dienst `ultimate-dash.service` ein und startet ihn. |
+| 3   | repair system         | Prüft Pakete, Node.js, pnpm, Benutzer, Ordner und Rechte, Konfiguration, Node-Module, Build, Datenbank (`integrity_check`) und Dienst. Fehlendes wird nachinstalliert, Dienst bei Bedarf neu gestartet. |
+| 4   | update dependencies   | Aktualisiert Systempakete, Node.js (innerhalb von 22.x) und pnpm und installiert die Node-Module laut `pnpm-lock.yaml` neu, auch native Module.                                                    |
+| 5   | update ultimate dash  | Legt zuerst ein Backup an, holt den neuesten Stand, baut neu und startet den Dienst. Schlägt das Bauen fehl, wird der alte Stand wiederhergestellt. Migrationen laufen beim Start.               |
+| 6   | create local backup   | Sichert Datenbank (konsistent per SQLite-Backup, auch bei laufendem Dienst), Datenordner und `ultimate-dash.env` als `.tar.gz`.                                                                   |
+| 7   | restore local backup  | Zeigt die vorhandenen Backups zur Auswahl, sichert den aktuellen Stand als `vor-restore-…`, stoppt den Dienst, spielt das Backup ein und startet neu.                                              |
+| 8   | exit                  | Beendet das Skript.                                                                                                                                                                                |
+
+Ohne Menü, z. B. für Automatisierung: `sudo ./install.sh <deps|install|repair|update-deps|update|backup|restore>`. Mit `UD_ASSUME_YES=1` werden Rückfragen mit „ja“ beantwortet.
+
+### Orte
+
+| Was           | Pfad                                       |
+| ------------- | ------------------------------------------ |
+| Programm      | `/opt/ultimate-dash`                       |
+| Daten         | `/var/lib/ultimate-dash`                   |
+| Konfiguration | `/etc/ultimate-dash/ultimate-dash.env`     |
+| Backups       | `/var/backups/ultimate-dash` (nur für root) |
+| Dienst        | `systemctl status ultimate-dash`           |
+| Log           | `journalctl -u ultimate-dash -f`           |
+
+Die Variablen aus `.env.example` (Technitium, SMTP, OIDC …) trägst du in die Konfigurationsdatei ein und startest danach mit `systemctl restart ultimate-dash` neu. Orte, Branch und Quelle lassen sich mit `UD_APP_DIR`, `UD_DATA_DIR`, `UD_CONF_DIR`, `UD_BACKUP_DIR`, `UD_BRANCH` und `UD_REPO_URL` ändern; setze sie bei jedem Aufruf gleich.
+
+Ein Backup enthält Zugangsdaten. Kopiere es für echte Sicherheit zusätzlich auf einen anderen Rechner, denn „lokal“ heißt: auf demselben Host.
+
+Passwort vergessen: `sudo -u ultimate-dash bash -c 'set -a; . /etc/ultimate-dash/ultimate-dash.env; cd /opt/ultimate-dash/apps/server && node dist/main.js reset-link admin'` (`admin` durch den Benutzernamen ersetzen).
+
 ## Hinter einem Reverse-Proxy (HTTPS)
 
 Ultimate Dash funktioniert hinter Caddy, Traefik, nginx oder Nginx Proxy Manager. Wichtig:
