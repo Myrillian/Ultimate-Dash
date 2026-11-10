@@ -40,7 +40,7 @@ export function describeError(error: unknown): string {
   return 'Unbekannter Fehler';
 }
 
-/** Prüft eine URL per HEAD und fällt auf GET zurück, wenn HEAD nicht unterstützt wird. */
+/** Prüft eine URL per HEAD und wiederholt mit GET, wenn HEAD fehlschlägt oder nicht erreichbar wirkt. */
 export async function checkUrl(
   serviceId: number,
   url: string,
@@ -58,8 +58,16 @@ export async function checkUrl(
     });
 
   try {
-    let response = await request('HEAD');
-    if (response.status === 405 || response.status === 501) {
+    let response: Response;
+    try {
+      response = await request('HEAD');
+    } catch {
+      // Manche Geräte (Switches, Firewalls) beantworten oder schließen HEAD-Anfragen nicht.
+      response = await request('GET');
+    }
+    // Viele Dienste lehnen HEAD mit 404/400/500 ab, obwohl GET funktioniert.
+    if (!isReachable(response.status)) {
+      await response.body?.cancel().catch(() => undefined);
       response = await request('GET');
     }
     // Body verwerfen, damit die Verbindung freigegeben wird.

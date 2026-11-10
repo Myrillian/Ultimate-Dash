@@ -16,6 +16,7 @@
   import { theme } from '$lib/theme.svelte';
   import { toasts } from '$lib/toasts.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import { layout } from '$lib/layout.svelte';
   import GroupForm from '$lib/components/GroupForm.svelte';
   import GroupSection from '$lib/components/GroupSection.svelte';
   import SearchBar from '$lib/components/SearchBar.svelte';
@@ -333,7 +334,7 @@
         </div>
       {:else}
         <div
-          class="group-grid gap-y-6 sm:gap-y-8"
+          class={layout.compact ? 'group-grid-compact' : 'group-grid gap-y-6 sm:gap-y-8'}
           aria-label="Gruppen"
           use:dragHandleZone={{
             items: groupItems,
