@@ -126,6 +126,15 @@ dialog::backdrop {
     @apply grid gap-x-5;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
   }
+  /* Lückenlos: Gruppen füllen Spalten von oben nach unten, ohne Leerraum zwischen den Zeilen. */
+  .group-grid-compact {
+    column-width: 19rem;
+    column-gap: 1.25rem;
+  }
+  .group-grid-compact > * {
+    break-inside: avoid;
+    margin-bottom: 1.5rem;
+  }
   .btn {
     @apply inline-flex items-center justify-center gap-1.5 rounded-lg border border-line bg-elevated px-3 py-2 text-sm font-medium
       transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50;

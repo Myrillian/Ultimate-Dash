@@ -1,5 +1,6 @@
 <script lang="ts">
   import { auth } from '$lib/auth.svelte';
+  import { layout } from '$lib/layout.svelte';
   import { menus } from '$lib/menus.svelte';
   import UiIcon from './UiIcon.svelte';
   import UsersDialog from './UsersDialog.svelte';
@@ -127,7 +128,18 @@
           </ul>
         </section>
       {/if}
-      <section aria-labelledby="settings-backup" class:menu-section={auth.isAdmin}>
+      <section aria-labelledby="settings-view" class="menu-section">
+        <h2 id="settings-view" class="menu-heading">Ansicht</h2>
+        <ul class="grid">
+          <li>
+            <button type="button" class="menu-item" onclick={() => layout.toggle()}>
+              <input type="checkbox" checked={layout.compact} tabindex="-1" aria-hidden="true" />
+              Gruppen lückenlos anordnen
+            </button>
+          </li>
+        </ul>
+      </section>
+      <section aria-labelledby="settings-backup" class="menu-section">
         <h2 id="settings-backup" class="menu-heading">Backup</h2>
         <ul class="grid">
           <li>

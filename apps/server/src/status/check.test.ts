@@ -12,6 +12,14 @@ beforeAll(async () => {
       res.writeHead(405).end();
       return;
     }
+    if (req.url === '/head-404' && req.method === 'HEAD') {
+      res.writeHead(404).end();
+      return;
+    }
+    if (req.url === '/head-reset' && req.method === 'HEAD') {
+      req.socket.destroy();
+      return;
+    }
     if (req.url === '/error') {
       res.writeHead(500).end();
       return;
@@ -52,6 +60,16 @@ describe('checkUrl', () => {
 
   it('wertet Login-Seiten als erreichbar', async () => {
     expect((await checkUrl(1, `${base}/login`, { timeoutMs: 1000 })).state).toBe('up');
+  });
+
+  it('wiederholt mit GET, wenn HEAD mit 404 abgelehnt wird', async () => {
+    const status = await checkUrl(1, `${base}/head-404`, { timeoutMs: 1000 });
+    expect(status).toMatchObject({ state: 'up', httpStatus: 200 });
+  });
+
+  it('wiederholt mit GET, wenn die Verbindung bei HEAD abbricht', async () => {
+    const status = await checkUrl(1, `${base}/head-reset`, { timeoutMs: 1000 });
+    expect(status).toMatchObject({ state: 'up', httpStatus: 200 });
   });
 
   it('meldet Serverfehler als down', async () => {
