@@ -4,9 +4,15 @@ Alle nennenswerten Änderungen pro Version. Der Abschnitt einer Version ist zugl
 
 ## [Unveröffentlicht]
 
+## [1.1.0] – 2026-11-12
+
 ### Installation
 
 - `install.sh migrate-docker` übernimmt Daten und Einstellungen einer Docker-Installation (siehe Installationsanleitung)
+
+### Dashboard
+
+- Fehler behoben: Im Bearbeiten-Modus überlappten Service-Kacheln benachbarte Gruppen, wenn Namen oder Adressen lang waren
 
 ## [1.0.0] – 2026-11-12
 
@@ -53,4 +59,5 @@ Erste offizielle Veröffentlichung.
 
 - MIT-Lizenz, rechtliche Hinweise, Anleitungen, Issue-Vorlagen und `CONTRIBUTING.md`
 
+[1.1.0]: https://github.com/myrillian/ultimate-dash/releases/tag/v1.1.0
 [1.0.0]: https://github.com/myrillian/ultimate-dash/releases/tag/v1.0.0
