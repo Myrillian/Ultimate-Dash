@@ -178,11 +178,14 @@ describe('Zoraxy-Verbindung', () => {
     // Die einzige Ausnahme ist die Anmeldung (Test und laufende Sitzung melden sich getrennt an).
     expect(writes.length).toBeGreaterThan(0);
     expect(writes.every((r) => r.method === 'POST' && r.path === '/api/auth/login')).toBe(true);
-    expect(
-      fake.requests
-        .filter((r) => r.method === 'GET' && r.path !== '/')
-        .every((r) => isAllowedPath(r.path)),
-    ).toBe(true);
+    // Außer den beiden Seiten für das CSRF-Token gehen nur erlaubte API-Pfade raus.
+    const gets = fake.requests.filter((r) => r.method === 'GET');
+    expect(gets.filter((r) => !r.path.startsWith('/api/')).map((r) => r.path)).toEqual(
+      expect.arrayContaining(['/login.html', '/']),
+    );
+    expect(gets.filter((r) => r.path.startsWith('/api/')).every((r) => isAllowedPath(r.path))).toBe(
+      true,
+    );
     expect(isAllowedPath('/api/proxy/del')).toBe(false);
     expect(isAllowedPath('/api/conf/export')).toBe(false);
     expect(isAllowedPath('/api/proxy/list/../del')).toBe(false);
