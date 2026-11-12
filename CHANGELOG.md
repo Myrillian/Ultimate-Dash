@@ -4,6 +4,10 @@ Alle nennenswerten Änderungen pro Version. Der Abschnitt einer Version ist zugl
 
 ## [Unveröffentlicht]
 
+### Installation
+
+- Fehler behoben: Ein im Terminal offenes Menü von `install.sh` blockierte Updates aus der Oberfläche („Ein anderer Lauf des Installationsskripts ist noch aktiv“). Die Sperre gilt jetzt nur noch während einer Aktion, und der Update-Dienst wartet bis zu 60 Sekunden darauf
+
 ## [1.1.0] – 2026-11-12
 
 ### Installation
