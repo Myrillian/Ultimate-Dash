@@ -219,7 +219,9 @@
             </dd>
           {:else}
             <dd class="mt-1 text-xl font-semibold text-fg-muted">–</dd>
-            <dd class="mt-0.5 text-xs text-fg-muted">kein Uptime-Monitor</dd>
+            <dd class="mt-0.5 text-xs text-fg-muted">
+              keine Uptime-Werte (Zoraxy › Uptime Monitor)
+            </dd>
           {/if}
         </div>
         <div class="min-w-0 rounded-2xl border border-line bg-elevated p-3 sm:p-4">
@@ -283,15 +285,25 @@
                       : ''}</span
                   >
                 {/if}
+                {#if host.hitsToday !== null}
+                  <span
+                    class="ml-auto shrink-0 text-xs text-fg-muted tabular-nums"
+                    title="Aufrufe heute"
+                  >
+                    <b class="font-semibold text-fg">{formatCount(host.hitsToday)}</b>
+                    <span class="sr-only">Aufrufe heute</span><span aria-hidden="true"> Hits</span>
+                  </span>
+                {/if}
                 {#if host.certDays !== null}
                   <span
-                    class="ml-auto shrink-0 text-xs tabular-nums {certTone(host.certDays)}"
+                    class="shrink-0 text-xs tabular-nums {certTone(host.certDays)}"
+                    class:ml-auto={host.hitsToday === null}
                     title="Zertifikat"
                   >
                     <UiIcon name="shield" size={12} class="inline -translate-y-px" />
                     {formatDays(host.certDays)}
                   </span>
-                {:else}
+                {:else if host.hitsToday === null}
                   <span class="ml-auto"></span>
                 {/if}
               </li>

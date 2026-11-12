@@ -28,7 +28,7 @@ const num = (value: unknown) =>
 const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
 export interface UptimeEntry {
-  /** Host aus der überwachten Adresse, kleingeschrieben */
+  /** Name des überwachten Hosts (bei Zoraxy die Domain der Regel), kleingeschrieben */
   host: string;
   online: boolean;
 }
@@ -45,32 +45,39 @@ export function hostOf(value: string): string {
   }
 }
 
+/** Zoraxy hängt bei mehreren Zielen einer Regel „ (upstream:1)“ an den Namen. */
+const baseName = (value: string) =>
+  value
+    .replace(/\s*\(upstream:\d+\)\s*$/i, '')
+    .trim()
+    .toLowerCase();
+
 /**
- * Der Uptime-Monitor liefert je Ziel eine Liste von Messwerten (oder einen Objekt-Eintrag je
- * Ziel). Es zählt der jeweils letzte Wert.
+ * Der Uptime-Monitor liefert eine Zuordnung von Ziel-ID zu einer Liste von Messwerten. Die ID
+ * ist die Domain der Proxy-Regel (bei mehreren Zielen mit Zusatz), die Adresse im Messwert
+ * dagegen das Ziel hinter dem Proxy. Es zählt der jeweils letzte Wert; ein Host mit mehreren
+ * Zielen gilt als erreichbar, solange eines antwortet.
  */
 export function parseUptime(raw: unknown): UptimeEntry[] {
-  const records: unknown[] = [];
-  const collect = (value: unknown) => {
+  const found: { key: string; record: unknown }[] = [];
+  const collect = (value: unknown, key: string) => {
     if (Array.isArray(value)) {
       const last = value[value.length - 1];
-      if (
-        isObject(last) &&
-        ('Online' in last || 'online' in last || 'URL' in last || 'url' in last)
-      )
-        records.push(last);
-      else value.forEach(collect);
+      if (isObject(last) && ('Online' in last || 'online' in last))
+        found.push({ key, record: last });
+      else value.forEach((item) => collect(item, key));
     } else if (isObject(value)) {
-      if (field(value, 'Online') !== undefined) records.push(value);
-      else Object.values(value).forEach(collect);
+      if (field(value, 'Online') !== undefined) found.push({ key, record: value });
+      else for (const [k, v] of Object.entries(value)) collect(v, k);
     }
   };
-  collect(raw);
+  collect(raw, '');
   const entries = new Map<string, boolean>();
-  for (const record of records) {
-    const host = hostOf(text(field(record, 'URL', 'Name', 'ID')));
+  for (const { key, record } of found) {
+    const name = baseName(text(field(record, 'ID', 'Name')) || key);
     const online = field(record, 'Online');
-    if (host && typeof online === 'boolean') entries.set(host, online);
+    if (!name || typeof online !== 'boolean') continue;
+    entries.set(name, (entries.get(name) ?? false) || online);
   }
   return [...entries].map(([host, online]) => ({ host, online }));
 }
@@ -115,7 +122,7 @@ const DAY = 86_400_000;
 export const daysUntil = (date: Date | null, now: number) =>
   date ? Math.floor((date.getTime() - now) / DAY) : null;
 
-function parseHost(item: unknown): Omit<ZoraxyHost, 'online' | 'certDays'> | null {
+function parseHost(item: unknown): Omit<ZoraxyHost, 'online' | 'certDays' | 'hitsToday'> | null {
   const domain = text(field(item, 'RootOrMatchingDomain'));
   if (!domain) return null;
   const upstream = (value: unknown, active: boolean) => {
@@ -134,6 +141,19 @@ function parseHost(item: unknown): Omit<ZoraxyHost, 'online' | 'certDays'> | nul
   };
 }
 
+/** Aufrufe je Hostname aus der Tagesstatistik (`Downstreams`), Port entfernt, kleingeschrieben. */
+export function parseHits(stats: unknown): Map<string, number> | null {
+  const downstreams = field(stats, 'Downstreams', 'DownstreamHostnames');
+  if (!isObject(downstreams)) return null;
+  const hits = new Map<string, number>();
+  for (const [name, count] of Object.entries(downstreams)) {
+    const value = num(count);
+    const host = hostOf(name);
+    if (value !== null && host) hits.set(host, (hits.get(host) ?? 0) + value);
+  }
+  return hits;
+}
+
 export interface SummaryInput {
   hosts: unknown;
   certificates: unknown | null;
@@ -145,6 +165,7 @@ export interface SummaryInput {
 
 export function summarize(input: SummaryInput, now = new Date()): ZoraxySummary {
   const certificates = input.certificates === null ? [] : parseCertificates(input.certificates);
+  const hits = parseHits(input.stats);
   const uptime = new Map(
     (input.uptime === null ? [] : parseUptime(input.uptime)).map((e) => [e.host, e.online]),
   );
@@ -170,8 +191,13 @@ export function summarize(input: SummaryInput, now = new Date()): ZoraxySummary 
           return days.length ? Math.max(...days) : null;
         })
         .filter((days): days is number => days !== null);
+      // Aufrufe der Domain und ihrer Aliase zusammen; null = Zoraxy liefert keine Statistik.
+      const hitsToday = hits
+        ? names.reduce((sum, name) => sum + (hits.get(hostOf(name)) ?? 0), 0)
+        : null;
       return {
         ...host,
+        hitsToday,
         online: monitored.length === 0 ? null : monitored.every(Boolean),
         certDays: covering.length === 0 ? null : Math.min(...covering),
       };
