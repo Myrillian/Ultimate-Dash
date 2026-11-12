@@ -51,6 +51,7 @@ Ein einziger Docker-Container (multi-arch, amd64/arm64) mit Web-Frontend, API-Ba
 
 - Docker- und Kubernetes-Discovery, Container-Statistiken
 - Proxmox (VMs, LXCs, Ressourcen)
+- Zoraxy (Proxy-Hosts, Zertifikate, Uptime; umgesetzt, rein lesend, siehe [Zoraxy](09-zoraxy.md))
 - Widget-Katalog (Systemressourcen, Uptime Kuma, \*arr, Home Assistant …), generischer API- und Prometheus-Widget
 - OIDC, mehrere Benutzer, Sichtbarkeit nach Rolle
 

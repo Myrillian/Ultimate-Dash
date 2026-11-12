@@ -43,6 +43,7 @@ Alles Weitere geht im Browser unter **Einstellungen** (Zahnrad oben rechts) › 
 
 - [Technitium DNS](technitium.md) für DNS-Statistik, Zonen, DHCP und IPAM
 - [Proxmox VE](proxmox.md) für die Host-Auslastung
+- [Zoraxy](../09-zoraxy.md) für Proxy-Hosts, Zertifikate und Anfragen
 - [Mailserver](konfiguration.md#mailserver) für „Passwort vergessen“ per E-Mail
 - _Feeds verwalten_ für die Neuigkeiten-Leiste
 
@@ -104,7 +105,7 @@ Das Menü bietet genau diese Punkte:
 | 9   | uninstall ultimate dash | Fragt nach, bietet vorher ein Backup an, entfernt Dienst und Programmordner. Daten, Konfiguration und Backups bleiben, bis du `loeschen` eintippst. Node.js und Systempakete bleiben installiert. |
 | 10  | exit                  | Beendet das Skript. |
 
-Ohne Menü, z. B. für Automatisierung: `sudo ./install.sh <deps|install|repair|update-deps|update|backup|restore|restart|uninstall>`. Mit `UD_ASSUME_YES=1` werden Rückfragen mit „ja“ beantwortet; `UD_PURGE=1` löscht bei `uninstall` zusätzlich Daten, Konfiguration und Benutzer.
+Ohne Menü, z. B. für Automatisierung: `sudo ./install.sh <deps|install|repair|update-deps|update|backup|restore|restart|uninstall|migrate-docker [Ordner]>` (`migrate-docker` siehe unten). Mit `UD_ASSUME_YES=1` werden Rückfragen mit „ja“ beantwortet; `UD_PURGE=1` löscht bei `uninstall` zusätzlich Daten, Konfiguration und Benutzer.
 
 ### Umstieg von Docker auf das Installationsskript
 

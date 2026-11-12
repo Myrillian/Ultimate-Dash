@@ -14,21 +14,21 @@ docker compose up -d --build
 
 Ohne Docker auf einem Ubuntu- oder Debian-Host: `sudo ./install.sh` startet ein Menü für Installation, Reparatur, Updates und Backups (siehe [Installation](docs/anleitungen/installation.md#alternative-installationsskript-ohne-docker-ubuntudebian)).
 
-Danach `http://<IP des Hosts>:3000` öffnen und das erste Administrator-Konto anlegen. Technitium, Proxmox und den Mailserver richtest du anschließend unter **Einstellungen › Verbindungen** ein.
+Danach `http://<IP des Hosts>:3000` öffnen und das erste Administrator-Konto anlegen. Technitium, Proxmox, Zoraxy und den Mailserver richtest du anschließend unter **Einstellungen › Verbindungen** ein.
 
 ## Anleitungen
 
-| Anleitung                                          | Inhalt                                               |
-| -------------------------------------------------- | ---------------------------------------------------- |
-| [Installation](docs/anleitungen/installation.md)   | Docker, erstes Konto, Update, Backup, Reverse-Proxy  |
-| [Konfiguration](docs/anleitungen/konfiguration.md) | Umgebungsvariablen, Einstellungen, Mailserver, OIDC  |
-| [Technitium DNS](docs/anleitungen/technitium.md)   | Benutzer, Rechte und Token, mehrere Server           |
-| [Proxmox VE](docs/anleitungen/proxmox.md)          | Nur-Lese-Token mit PVEAuditor für Benutzer und Token |
+| Anleitung                                          | Inhalt                                                                |
+| -------------------------------------------------- | --------------------------------------------------------------------- |
+| [Installation](docs/anleitungen/installation.md)   | Docker oder `install.sh`, erstes Konto, Update, Backup, Reverse-Proxy |
+| [Konfiguration](docs/anleitungen/konfiguration.md) | Umgebungsvariablen, Einstellungen, Mailserver, OIDC                   |
+| [Technitium DNS](docs/anleitungen/technitium.md)   | Benutzer, Rechte und Token, mehrere Server                            |
+| [Proxmox VE](docs/anleitungen/proxmox.md)          | Nur-Lese-Token mit PVEAuditor für Benutzer und Token                  |
 
 ## Ziele
 
 - **Dashboard:** Gruppen, Services, Bookmarks, Icons, Suche, Themes, Statusprüfungen (HTTP/Ping), Widgets mit Live-Daten, Bearbeitung direkt im UI
-- **Integrationen:** Docker- und Kubernetes-Discovery, Proxmox, Systemressourcen, generische API- und Prometheus-Widgets
+- **Integrationen:** Docker- und Kubernetes-Discovery, Proxmox, Zoraxy, Systemressourcen, generische API- und Prometheus-Widgets
 - **IPAM mit Technitium:** Netze, Gerätegruppen, farbiges IP-Raster, DNS-Einträge, DHCP-Leases und -Reservierungen verwalten, Wizard für neue IPs
 - **DNS-Statistiken und Blocking:** Grafiken zu Queries und Blocking, Blocking pausieren, Domains blockieren oder erlauben
 - **Sicherheit:** alle Fremd-APIs laufen über das Backend, Login lokal oder per OIDC, Änderungsprotokoll
