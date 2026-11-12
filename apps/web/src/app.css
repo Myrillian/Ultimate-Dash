@@ -126,6 +126,11 @@ dialog::backdrop {
     @apply grid gap-x-5;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
   }
+  /* Kinder dürfen nie breiter als ihre Spalte werden (sonst überlappen Gruppen). */
+  .group-grid > *,
+  .group-grid-compact > * {
+    min-width: 0;
+  }
   /* Lückenlos: Gruppen füllen Spalten von oben nach unten, ohne Leerraum zwischen den Zeilen. */
   .group-grid-compact {
     column-width: 19rem;
