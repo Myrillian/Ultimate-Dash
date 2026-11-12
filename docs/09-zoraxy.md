@@ -35,7 +35,8 @@ Fallen Zertifikate, Uptime oder Anfragen aus, bleibt der Rest sichtbar und der B
 
 ## Berechnung
 
-- **Erreichbar:** letzter Wert des Uptime-Monitors von Zoraxy; zugeordnet über den Hostnamen der überwachten Adresse zu Domain oder Alias der Regel. Ohne Eintrag gilt der Host als „nicht überwacht“.
+- **Erreichbar:** letzter Wert des Uptime-Monitors von Zoraxy. Zoraxy legt für jede aktive Regel Ziele an, deren ID die Domain der Regel ist (bei mehreren Zielen mit Zusatz „ (upstream:1)“); die Adresse im Messwert ist dagegen das Ziel hinter dem Proxy. Zugeordnet wird deshalb über die ID, ein Host mit mehreren Zielen gilt als erreichbar, solange eines antwortet. Regeln mit abgeschaltetem Uptime-Monitor gelten als „nicht überwacht“.
+- **Hits heute:** Zoraxy zählt Aufrufe je Hostname in der Tagesstatistik (`Downstreams`). Das Dashboard zeigt sie je Host (Domain und Aliase zusammen). Gezählt werden Seitenaufrufe, Bilder, Skripte und Ähnliches nicht; der Zähler beginnt mit dem Tag neu.
 - **Zertifikat:** Ein Host erhält das genau passende Zertifikat, sonst ein Wildcard-Zertifikat (`*.example.org` deckt genau eine Ebene; Zoraxy-Dateiname `_.example.org`). Bei mehreren Namen (Alias) zählt der kürzeste Wert.
 - **Nächster Ablauf:** kürzeste Restlaufzeit aller Zertifikate.
 

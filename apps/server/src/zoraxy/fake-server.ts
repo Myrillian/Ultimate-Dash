@@ -66,25 +66,66 @@ const seed = () => ({
       RemainingDays: 5,
     },
   ] as unknown[],
+  // Wie Zoraxy: Schlüssel und ID sind die Domain der Regel, die Adresse ist das Ziel dahinter.
   uptime: {
     'nextcloud.example.org': [
       {
         Timestamp: 1,
-        ID: 'a',
-        Name: 'nextcloud',
-        URL: 'https://nextcloud.example.org',
+        ID: 'nextcloud.example.org',
+        Name: 'nextcloud.example.org',
+        URL: 'http://192.168.1.20:8080',
+        Protocol: 'http',
         Online: true,
+        StatusCode: 200,
+        Latency: 12,
       },
     ],
     'ha.example.org': [
-      { Timestamp: 1, ID: 'b', Name: 'ha', URL: 'https://ha.example.org', Online: true },
+      {
+        Timestamp: 1,
+        ID: 'ha.example.org',
+        Name: 'ha.example.org',
+        URL: 'http://192.168.1.30:8123',
+        Protocol: 'http',
+        Online: true,
+        StatusCode: 200,
+        Latency: 8,
+      },
     ],
-    'wiki.example.org': [
-      { Timestamp: 1, ID: 'c', Name: 'wiki', URL: 'https://wiki.example.org', Online: true },
-      { Timestamp: 2, ID: 'c', Name: 'wiki', URL: 'https://wiki.example.org', Online: false },
+    'wiki.example.org (upstream:0)': [
+      {
+        Timestamp: 1,
+        ID: 'wiki.example.org (upstream:0)',
+        Name: 'wiki.example.org (upstream:0)',
+        URL: 'http://192.168.1.40:3000',
+        Protocol: 'http',
+        Online: true,
+        StatusCode: 200,
+        Latency: 9,
+      },
+      {
+        Timestamp: 2,
+        ID: 'wiki.example.org (upstream:0)',
+        Name: 'wiki.example.org (upstream:0)',
+        URL: 'http://192.168.1.40:3000',
+        Protocol: 'http',
+        Online: false,
+        StatusCode: 0,
+        Latency: 0,
+      },
     ],
   } as unknown,
-  stats: { TotalRequest: 1234, ValidRequest: 1200, ErrorRequest: 34 } as unknown,
+  stats: {
+    TotalRequest: 1234,
+    ValidRequest: 1200,
+    ErrorRequest: 34,
+    Downstreams: {
+      'nextcloud.example.org': 800,
+      'ha.example.org': 300,
+      'home.example.org:443': 20,
+    },
+    Upstreams: { '192.168.1.20:8080': 800 },
+  } as unknown,
 });
 
 export async function startFakeZoraxy(

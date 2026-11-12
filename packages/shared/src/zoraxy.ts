@@ -45,6 +45,8 @@ export interface ZoraxyHost {
   tags: string[];
   /** Antwort laut Uptime-Monitor von Zoraxy; null = nicht überwacht */
   online: boolean | null;
+  /** Aufrufe heute (Domain und Aliase); null = Zoraxy liefert keine Statistik */
+  hitsToday: number | null;
   /** Restlaufzeit des passenden Zertifikats in Tagen; null = kein Zertifikat gefunden */
   certDays: number | null;
 }

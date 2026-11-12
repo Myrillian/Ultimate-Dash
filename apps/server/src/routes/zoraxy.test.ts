@@ -123,9 +123,14 @@ describe('Zoraxy-Verbindung', () => {
       'alt.example.org',
     ]);
     const ha = summary.hosts[0]!;
-    expect(ha).toMatchObject({ online: true, aliases: ['home.example.org'], enabled: true });
+    expect(ha).toMatchObject({
+      online: true,
+      aliases: ['home.example.org'],
+      enabled: true,
+      hitsToday: 320,
+    });
     expect(ha.certDays).toBeGreaterThanOrEqual(29);
-    expect(summary.hosts[2]).toMatchObject({ online: false });
+    expect(summary.hosts[2]).toMatchObject({ online: false, hitsToday: 0 });
     expect(summary.hosts[2]!.certDays).toBeLessThanOrEqual(5);
     expect(summary.hosts[3]).toMatchObject({ enabled: false, online: null });
     expect(summary.nextExpiryDays).toBeLessThanOrEqual(5);

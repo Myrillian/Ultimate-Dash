@@ -3,6 +3,7 @@ import {
   certCovers,
   hostOf,
   parseCertificates,
+  parseHits,
   parseUptime,
   parseVersion,
   summarize,
@@ -36,19 +37,34 @@ describe('Zoraxy-Auswertung', () => {
     expect(certs[1]).toEqual({ domain: 'plain.example.org', expiresAt: null });
   });
 
-  it('nimmt beim Uptime-Monitor den letzten Wert je Ziel', () => {
+  it('ordnet den Uptime-Monitor über die ID der Regel zu, nicht über die Zieladresse', () => {
     const entries = parseUptime({
-      a: [
-        { URL: 'https://a.example.org', Online: true },
-        { URL: 'https://a.example.org', Online: false },
+      'a.example.org': [
+        { ID: 'a.example.org', URL: 'http://10.0.0.5:80', Online: true },
+        { ID: 'a.example.org', URL: 'http://10.0.0.5:80', Online: false },
       ],
-      b: [{ URL: 'b.example.org', Online: true }],
+      'b.example.org (upstream:0)': [
+        { ID: 'b.example.org (upstream:0)', URL: 'http://10.0.0.6:80', Online: false },
+      ],
+      'b.example.org (upstream:1)': [
+        { ID: 'b.example.org (upstream:1)', URL: 'http://10.0.0.7:80', Online: true },
+      ],
     });
+    // Mehrere Ziele: erreichbar, solange eines antwortet.
     expect(entries).toEqual([
       { host: 'a.example.org', online: false },
       { host: 'b.example.org', online: true },
     ]);
     expect(parseUptime(null)).toEqual([]);
+  });
+
+  it('liest die Aufrufe je Hostname', () => {
+    const hits = parseHits({
+      Downstreams: { 'A.example.org': 5, 'a.example.org:443': 2, x: 'kaputt' },
+    });
+    expect(hits?.get('a.example.org')).toBe(7);
+    expect(hits?.has('x')).toBe(false);
+    expect(parseHits({ TotalRequest: 1 })).toBeNull();
   });
 
   it('liest die Version aus verschiedenen Formen', () => {
@@ -78,8 +94,14 @@ describe('Zoraxy-Auswertung', () => {
           { Domain: '_.example.org', ExpireDate: '2026-11-20 08:00:00' },
           { Domain: 'd.example.org', ExpireDate: '2026-11-17 08:00:00' },
         ],
-        uptime: [[{ URL: 'https://b.example.org', Online: false }]],
-        stats: { TotalRequest: 10, ErrorRequest: 2 },
+        uptime: {
+          'b.example.org': [{ ID: 'b.example.org', URL: 'http://10.0.0.2:80', Online: false }],
+        },
+        stats: {
+          TotalRequest: 10,
+          ErrorRequest: 2,
+          Downstreams: { 'b.example.org': 4, 'c.example.org': 3 },
+        },
         version: '3.3.4',
         warnings: [],
       },
@@ -102,7 +124,7 @@ describe('Zoraxy-Auswertung', () => {
       aliases: ['c.example.org'],
     });
     // Exakt und per Wildcard abgedeckt: das genau passende Zertifikat gilt.
-    expect(summary.hosts[1]).toMatchObject({ online: null, certDays: 5 });
+    expect(summary.hosts[1]).toMatchObject({ online: null, certDays: 5, hitsToday: 0 });
     expect(summary.counts).toEqual({ hosts: 3, enabled: 2, online: 0, offline: 1 });
     expect(summary.nextExpiryDays).toBe(5);
     expect(summary.certificates[0]!.domain).toBe('d.example.org');
@@ -121,7 +143,7 @@ describe('Zoraxy-Auswertung', () => {
       },
       now,
     );
-    expect(summary.hosts[0]).toMatchObject({ online: null, certDays: null });
+    expect(summary.hosts[0]).toMatchObject({ online: null, certDays: null, hitsToday: null });
     expect(summary.requests).toBeNull();
     expect(summary.nextExpiryDays).toBeNull();
     expect(summary.warnings).toHaveLength(1);
