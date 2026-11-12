@@ -19,9 +19,9 @@ Alternativ per Umgebungsvariablen `ZORAXY_URL`, `ZORAXY_USERNAME`, `ZORAXY_PASSW
 
 ## Zugang und Sicherheit
 
-Zoraxy hat keine API-Tokens und nur ein einziges Konto mit Vollzugriff. Der Server meldet sich deshalb mit diesem Konto an (`POST /api/auth/login`), hält Sitzungs-Cookie und, falls Zoraxy eines liefert, das CSRF-Token der Startseite (`<meta name="zoraxy.csrf.Token">`) nur im Speicher und meldet sich bei Ablauf selbst neu an.
+Zoraxy hat keine API-Tokens und nur ein einziges Konto mit Vollzugriff. Der Server meldet sich deshalb mit diesem Konto an (`POST /api/auth/login`), holt zuerst das CSRF-Token von `/login.html` (Zoraxy schützt auch die Anmeldung per gorilla/csrf: Cookie `_gorilla_csrf` plus Kopfzeile `X-CSRF-Token`, Token als `<meta name="zoraxy.csrf.Token">`), hält Sitzungs-Cookie und Token nur im Speicher und meldet sich bei Ablauf selbst neu an.
 
-Technisch erzwungen ist, dass nichts verändert wird: Der Client kennt nur `GET` auf fünf Pfaden (Anmeldung ausgenommen):
+Technisch erzwungen ist, dass nichts verändert wird: Der Client kennt nur `GET` auf fünf Pfaden (Anmeldung und die Seiten für das CSRF-Token ausgenommen):
 
 | Pfad | Zweck |
 | --- | --- |

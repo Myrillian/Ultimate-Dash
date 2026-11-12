@@ -136,11 +136,30 @@ export class ZoraxySession {
     }
   }
 
-  /** Meldet sich an und holt, falls vorhanden, das CSRF-Token der Verwaltungsoberfläche. */
+  /**
+   * Zoraxy schützt die ganze Verwaltungsoberfläche, auch die Anmeldung, mit einem CSRF-Token
+   * (gorilla/csrf): ein Cookie plus dasselbe Token als Kopfzeile `X-CSRF-Token`. Das Token
+   * steht als <meta name="zoraxy.csrf.Token"> in den HTML-Seiten.
+   */
+  private async fetchCsrf(paths: string[]): Promise<void> {
+    for (const path of paths) {
+      const response = await this.send('GET', path);
+      const html = await response.text().catch(() => '');
+      const meta = /<meta[^>]*name=["']zoraxy\.csrf\.Token["'][^>]*>/i.exec(html)?.[0];
+      const token = meta ? /content=["']([^"']*)["']/i.exec(meta)?.[1] : undefined;
+      if (token) {
+        this.csrf = token;
+        return;
+      }
+    }
+  }
+
+  /** Meldet sich an: erst CSRF-Token holen, dann Benutzername und Passwort senden. */
   private async login(): Promise<void> {
     this.cookies.clear();
     this.csrf = null;
     this.loggedIn = false;
+    await this.fetchCsrf(['/login.html', '/']);
     const response = await this.send('POST', '/api/auth/login', {
       form: {
         username: this.connection.username,
@@ -149,7 +168,28 @@ export class ZoraxySession {
       },
     });
     const body = await response.text().catch(() => '');
-    if (response.status === 401 || response.status === 403 || /"error"\s*:/.test(body)) {
+    // Zoraxy meldet Anmeldefehler als JSON {"error": "..."}, meist mit Status 200.
+    let reason: string | null = null;
+    try {
+      const data = JSON.parse(body) as unknown;
+      if (data && typeof data === 'object' && 'error' in data) reason = String(data.error);
+    } catch {
+      // kein JSON: Erfolg ("ok") oder eine Fehlerseite
+    }
+    if (reason !== null) {
+      if (/invalid username or password|incorrect/i.test(reason))
+        throw new ZoraxyError('Benutzername oder Passwort von Zoraxy sind falsch', 'auth');
+      throw new ZoraxyError(`Zoraxy lehnt die Anmeldung ab: ${reason}`, 'api');
+    }
+    if (response.status === 403 || /csrf/i.test(body)) {
+      throw new ZoraxyError(
+        this.csrf
+          ? 'Zoraxy hat die Anmeldung wegen des CSRF-Schutzes abgelehnt (HTTP 403)'
+          : 'Zoraxy verlangt ein CSRF-Token, ich finde es aber nicht in der Anmeldeseite. Ist die Adresse die der Verwaltungsoberfläche?',
+        'api',
+      );
+    }
+    if (response.status === 401) {
       throw new ZoraxyError('Benutzername oder Passwort von Zoraxy sind falsch', 'auth');
     }
     if (!response.ok) {
@@ -158,11 +198,8 @@ export class ZoraxySession {
         'api',
       );
     }
-    // Zoraxy bettet das CSRF-Token als <meta name="zoraxy.csrf.Token"> in die Startseite ein.
-    const home = await this.send('GET', '/');
-    const html = await home.text().catch(() => '');
-    const meta = /<meta[^>]*name=["']zoraxy\.csrf\.Token["'][^>]*>/i.exec(html)?.[0];
-    this.csrf = meta ? (/content=["']([^"']*)["']/i.exec(meta)?.[1] ?? null) : null;
+    // Nach der Anmeldung ein frisches Token holen (gleiches Cookie, neue Seite).
+    await this.fetchCsrf(['/']);
     this.loggedIn = true;
   }
 

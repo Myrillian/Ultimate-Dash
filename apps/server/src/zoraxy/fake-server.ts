@@ -118,6 +118,21 @@ export async function startFakeZoraxy(
     const session = /(?:^|;\s*)zoraxy-session=([^;]+)/.exec(req.headers.cookie ?? '')?.[1];
     const authed = !!session && fake.sessions.has(session);
 
+    const csrfCookie = /(?:^|;\s*)_gorilla_csrf=([^;]+)/.exec(req.headers.cookie ?? '')?.[1];
+    if (url.pathname === '/login.html') {
+      res.writeHead(200, {
+        'content-type': 'text/html',
+        'set-cookie': '_gorilla_csrf=c1; Path=/; HttpOnly',
+      });
+      return res.end(
+        `<html><head><meta name="zoraxy.csrf.Token" content="${csrfToken}"></head><body></body></html>`,
+      );
+    }
+    // Wie gorilla/csrf: jede unsichere Anfrage braucht Cookie und Kopfzeile, auch die Anmeldung.
+    if (req.method === 'POST' && (!csrfCookie || req.headers['x-csrf-token'] !== csrfToken)) {
+      res.writeHead(403, { 'content-type': 'text/plain' });
+      return res.end('Forbidden - CSRF token invalid\n');
+    }
     if (url.pathname === '/api/auth/login' && req.method === 'POST') {
       let body = '';
       req.on('data', (chunk) => (body += chunk));
