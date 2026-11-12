@@ -5,6 +5,8 @@ const LABELS: Record<string, string> = {
   'technitium.disconnect': 'Technitium getrennt',
   'proxmox.connect': 'Proxmox verbunden',
   'proxmox.disconnect': 'Proxmox getrennt',
+  'zoraxy.connect': 'Zoraxy verbunden',
+  'zoraxy.disconnect': 'Zoraxy getrennt',
   'mail.connect': 'Mailserver eingerichtet',
   'mail.disconnect': 'Mailserver entfernt',
   'mail.test': 'Testmail verschickt',

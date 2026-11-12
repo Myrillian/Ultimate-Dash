@@ -28,6 +28,7 @@
   import NetMenu from '$lib/components/NetMenu.svelte';
   import DnsPanel from '$lib/components/DnsPanel.svelte';
   import ProxmoxPanel from '$lib/components/ProxmoxPanel.svelte';
+  import ZoraxyPanel from '$lib/components/ZoraxyPanel.svelte';
   import FeedPanel from '$lib/components/FeedPanel.svelte';
   import { news } from '$lib/feeds.svelte';
   import { menus } from '$lib/menus.svelte';
@@ -254,6 +255,7 @@
         <DnsPanel onconnect={() => (menus.technitiumOpen = true)} />
         {#if auth.isAdmin}
           <ProxmoxPanel onconnect={() => (menus.proxmoxOpen = true)} />
+          <ZoraxyPanel onconnect={() => (menus.zoraxyOpen = true)} />
         {/if}
       {/if}
       {#if dashboard.error && !dashboard.data}

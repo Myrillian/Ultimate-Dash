@@ -8,6 +8,7 @@
   import CopyDialog from './CopyDialog.svelte';
   import TechnitiumDialog from './TechnitiumDialog.svelte';
   import ProxmoxDialog from './ProxmoxDialog.svelte';
+  import ZoraxyDialog from './ZoraxyDialog.svelte';
   import MailDialog from './MailDialog.svelte';
   import FeedsDialog from './FeedsDialog.svelte';
   import DhcpServersDialog from './DhcpServersDialog.svelte';
@@ -111,6 +112,15 @@
               <button
                 type="button"
                 class="menu-item"
+                onclick={() => choose(() => (menus.zoraxyOpen = true))}
+              >
+                <UiIcon name="network" size={16} /> Zoraxy
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class="menu-item"
                 onclick={() => choose(() => (menus.mailOpen = true))}
               >
                 <UiIcon name="mail" size={16} /> Mailserver
@@ -183,6 +193,7 @@
     onchange={() => {}}
   />
   <ProxmoxDialog open={menus.proxmoxOpen} onclose={() => (menus.proxmoxOpen = false)} />
+  <ZoraxyDialog open={menus.zoraxyOpen} onclose={() => (menus.zoraxyOpen = false)} />
   <MailDialog open={menus.mailOpen} onclose={() => (menus.mailOpen = false)} />
   <FeedsDialog open={menus.feedsOpen} onclose={() => (menus.feedsOpen = false)} />
 {/if}

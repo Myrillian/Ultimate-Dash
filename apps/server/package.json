@@ -12,7 +12,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "fake:technitium": "tsx src/technitium/fake-main.ts",
-    "fake:proxmox": "tsx src/proxmox/fake-main.ts"
+    "fake:proxmox": "tsx src/proxmox/fake-main.ts",
+    "fake:zoraxy": "tsx src/zoraxy/fake-main.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
