@@ -70,7 +70,7 @@
   }
 </script>
 
-<section aria-labelledby="group-{group.id}-title" class="flex flex-col gap-3">
+<section aria-labelledby="group-{group.id}-title" class="flex min-w-0 flex-col gap-3">
   <header class="flex items-center gap-2">
     {#if props.editMode}
       <span
@@ -150,10 +150,10 @@
   </header>
 
   {#if !collapsed}
-    <div id={contentId} class="grid gap-2">
-      <div class="relative">
+    <div id={contentId} class="grid grid-cols-[minmax(0,1fr)] gap-2">
+      <div class="relative min-w-0">
         <div
-          class="grid min-h-14 gap-2"
+          class="grid min-h-14 grid-cols-[minmax(0,1fr)] gap-2"
           aria-label="Services in {group.name}"
           use:dragHandleZone={{
             items,
