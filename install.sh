@@ -965,8 +965,8 @@ cmd_apply_update_request() {
   tag="$raw"
 
   exec 9>/var/lock/ultimate-dash-install.lock
-  if ! flock -n 9; then
-    update_status failed "$tag" "Ein anderer Lauf des Installationsskripts ist noch aktiv"
+  if ! flock -w 60 9; then
+    update_status failed "$tag" "Ein anderer Lauf des Installationsskripts ist noch aktiv (Menü oder Update im Terminal beenden)"
     return 1
   fi
   if ! app_installed; then
@@ -1007,7 +1007,9 @@ run_action() { # Fehler einer Aktion beenden nicht das Menü
   local rc=0
   trap - ERR
   set +e
-  ( trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR; set -e; "$@" )
+  # Die Sperre gilt nur während der Aktion (Subshell), nicht für das offene Menü: Sonst blockiert
+  # ein im Terminal vergessenes Menü Updates aus der Oberfläche.
+  ( trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR; set -e; acquire_lock; "$@" )
   rc=$?
   set -e
   trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
@@ -1071,6 +1073,10 @@ main() {
   esac
   require_root
   require_os
+  # Unter systemd (Update aus der Oberfläche) ist HOME nicht gesetzt: git liest dann keine globale
+  # Konfiguration und lehnt den Programmordner (gehört dem Dienstbenutzer) als „dubious ownership“ ab.
+  export HOME="${HOME:-/root}"
+  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0="$APP_DIR"
   if [[ "${1:-}" == "apply-update-request" ]]; then
     # Das Update ersetzt install.sh im Git-Checkout; bash liest Skripte beim Ausführen nach.
     # Deshalb läuft eine Kopie, die vom Checkout unabhängig ist.
@@ -1083,9 +1089,9 @@ main() {
     cmd_apply_update_request
     return
   fi
-  acquire_lock
+  if [[ -n "${1:-}" ]]; then acquire_lock; fi
   case "${1:-}" in
-    '') menu ;;
+    '') menu ;; # Sperre erst je Aktion (run_action)
     deps) cmd_deps ;;
     install) cmd_install ;;
     repair) cmd_repair ;;
