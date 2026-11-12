@@ -11,11 +11,18 @@
   import MailDialog from './MailDialog.svelte';
   import FeedsDialog from './FeedsDialog.svelte';
   import DhcpServersDialog from './DhcpServersDialog.svelte';
+  import UpdateDialog from './UpdateDialog.svelte';
+  import { updates } from '$lib/update.svelte';
 
   let open = $state(false);
   let usersOpen = $state(false);
   let root: HTMLDivElement | undefined = $state();
   let trigger: HTMLButtonElement | undefined = $state();
+
+  // Admins sehen schon im Menü, ob eine neue Version bereitsteht (die API fragt höchstens stündlich).
+  $effect(() => {
+    if (auth.isAdmin && !updates.status) void updates.load();
+  });
 
   function close(returnFocus = false) {
     open = false;
@@ -73,6 +80,21 @@
                 onclick={() => choose(() => (usersOpen = true))}
               >
                 <UiIcon name="users" size={16} /> Benutzer verwalten
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class="menu-item"
+                onclick={() => choose(() => (menus.updateOpen = true))}
+              >
+                <UiIcon name="download" size={16} /> Updates
+                {#if updates.available}
+                  <span
+                    class="ml-auto rounded-full bg-accent px-2 py-0.5 text-xs text-accent-contrast"
+                    >Neu</span
+                  >
+                {/if}
               </button>
             </li>
           </ul>
@@ -185,6 +207,7 @@
   <ProxmoxDialog open={menus.proxmoxOpen} onclose={() => (menus.proxmoxOpen = false)} />
   <MailDialog open={menus.mailOpen} onclose={() => (menus.mailOpen = false)} />
   <FeedsDialog open={menus.feedsOpen} onclose={() => (menus.feedsOpen = false)} />
+  <UpdateDialog open={menus.updateOpen} onclose={() => (menus.updateOpen = false)} />
 {/if}
 
 <style>

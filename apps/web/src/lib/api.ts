@@ -75,6 +75,8 @@ import type {
   ProxmoxSettingsInput,
   ProxmoxSummary,
   ProxmoxTestResult,
+  UpdateInstallInput,
+  UpdateStatus,
 } from '@ultimate-dash/shared';
 
 export class ApiError extends Error {
@@ -162,6 +164,10 @@ export const api = {
   saveMail: (input: MailSettingsInput) => request<MailSettings>('PUT', '/mail/settings', input),
   testMail: (input: MailTestInput) => request<MailTestResult>('POST', '/mail/test', input),
   disconnectMail: () => request<void>('DELETE', '/mail/settings'),
+  updateStatus: () => request<UpdateStatus>('GET', '/update'),
+  checkUpdate: () => request<UpdateStatus>('POST', '/update/check'),
+  installUpdate: (input: UpdateInstallInput) =>
+    request<UpdateStatus>('POST', '/update/install', input),
 
   proxmoxSettings: () => request<ProxmoxSettings>('GET', '/proxmox/settings'),
   saveProxmox: (input: ProxmoxSettingsInput) =>
