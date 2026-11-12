@@ -55,6 +55,6 @@ Mit einem Beitrag erklärst du dich einverstanden, dass er unter der [MIT-Lizenz
 
 Die Update-Prüfung im Dashboard liest GitHub-Veröffentlichungen. Für ein Release:
 
-1. `version` in `package.json` von `apps/server`, `apps/web` und `packages/shared` anheben.
+1. `version` in `package.json` von `apps/server`, `apps/web` und `packages/shared` anheben und einen Abschnitt in `CHANGELOG.md` ergänzen.
 2. Tag `vX.Y.Z` setzen und pushen.
-3. Auf GitHub ein Release zu diesem Tag anlegen. Der Text der Release-Notizen ist das Änderungsprotokoll, das Admins vor der Installation bestätigen. Vorabversionen und Entwürfe werden ignoriert.
+3. Auf GitHub ein Release zu diesem Tag anlegen. Als Text der Release-Notizen dient der Abschnitt aus `CHANGELOG.md`. Er ist das Änderungsprotokoll, das Admins vor der Installation bestätigen. Vorabversionen und Entwürfe werden ignoriert.
