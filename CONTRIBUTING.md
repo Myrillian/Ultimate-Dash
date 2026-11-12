@@ -21,6 +21,7 @@ Ohne echte Server helfen die Simulationen:
 ```bash
 pnpm --filter @ultimate-dash/server fake:technitium   # Port 5380, Token dev-token
 pnpm --filter @ultimate-dash/server fake:proxmox      # Port 8006
+pnpm --filter @ultimate-dash/server fake:zoraxy       # Port 8000, Benutzer admin
 ```
 
 Aufbau des Monorepos:

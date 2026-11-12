@@ -28,6 +28,7 @@ Unter **Einstellungen** (oben rechts):
 | Bereich | Wer | Inhalt |
 | --- | --- | --- |
 | Admin › Benutzer verwalten | Admins | Benutzer anlegen, Rolle und E-Mail ändern, Passwort setzen, Reset-Link erzeugen, löschen |
+| Admin › Updates | Admins | Prüft auf neue Versionen und installiert sie bei `install.sh`-Installationen, siehe [Installation](installation.md#updates-aus-der-oberfläche) |
 | Verbindungen › Technitium DNS | Admins | Hauptverbindung zu Technitium, siehe [Anleitung](technitium.md) |
 | Verbindungen › Proxmox VE | Admins | Verbindung zu Proxmox, siehe [Anleitung](proxmox.md) |
 | Verbindungen › Zoraxy | Admins | Verbindung zu Zoraxy, siehe [Zoraxy](../09-zoraxy.md) |
@@ -123,6 +124,15 @@ Konten werden über den `sub`-Claim zugeordnet, eine Umbenennung beim Anbieter i
 
 Details in den Anleitungen zu [Technitium](technitium.md) und [Proxmox](proxmox.md).
 
+## Update-Prüfung
+
+| Variable | Standard | Bedeutung |
+| --- | --- | --- |
+| `UPDATE_CHECK` | `true` | `false` schaltet die Abfrage der GitHub-Veröffentlichungen unter Einstellungen › Updates ab |
+| `UPDATE_REPO` | `myrillian/ultimate-dash` | Repository (`Besitzer/Name`), dessen Veröffentlichungen geprüft werden |
+
+Die Prüfung fragt höchstens einmal pro Stunde. Installieren aus der Oberfläche geht nur bei `install.sh`-Installationen, siehe [Updates aus der Oberfläche](installation.md#updates-aus-der-oberfläche).
+
 ## Nur für die Entwicklung
 
-`HOST`, `DATABASE_FILE`, `MIGRATIONS_DIR` und `WEB_ROOT` sind im Docker-Image passend gesetzt und sollten dort nicht geändert werden. `SCRYPT_N` ist nur für Tests gedacht.
+`HOST`, `DATABASE_FILE`, `MIGRATIONS_DIR` und `WEB_ROOT` sind im Docker-Image passend gesetzt und sollten dort nicht geändert werden. `SCRYPT_N` ist nur für Tests gedacht. `UD_UPDATE_REQUEST_FILE` und `UD_UPDATE_STATUS_FILE` setzt `install.sh` im systemd-Dienst selbst (Ablageorte für das Update aus der Oberfläche); sie müssen nicht gesetzt werden.
