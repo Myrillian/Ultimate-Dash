@@ -62,6 +62,8 @@ docker compose up -d --build
 
 Datenbank-Migrationen laufen beim Start automatisch. Lege vor einem Update ein Backup an.
 
+Ob eine neue Version bereitsteht, zeigt **Einstellungen › Updates** (nur Admins). Mit Docker ist das nur eine Anzeige; installiert wird wie oben. Die Prüfung fragt höchstens einmal pro Stunde die GitHub-Veröffentlichungen ab und lässt sich mit `UPDATE_CHECK=false` abschalten (`UPDATE_REPO` ändert das Repository).
+
 ## Backup und Wiederherstellung
 
 Am sichersten bei gestopptem Container:
@@ -103,6 +105,12 @@ Das Menü bietet genau diese Punkte:
 | 10  | exit                  | Beendet das Skript. |
 
 Ohne Menü, z. B. für Automatisierung: `sudo ./install.sh <deps|install|repair|update-deps|update|backup|restore|restart|uninstall>`. Mit `UD_ASSUME_YES=1` werden Rückfragen mit „ja“ beantwortet; `UD_PURGE=1` löscht bei `uninstall` zusätzlich Daten, Konfiguration und Benutzer.
+
+### Updates aus der Oberfläche
+
+Bei einer Installation mit `install.sh` installiert **Einstellungen › Updates** neue Versionen direkt. Ablauf: Der Admin sieht das Änderungsprotokoll aller neueren Veröffentlichungen, muss ausdrücklich bestätigen, und der Server legt eine Anfrage im Datenordner ab. Der root-Dienst `ultimate-dash-update` (ausgelöst über `ultimate-dash-update.path`) prüft sie, legt ein Backup an, wechselt auf das Release-Tag, baut neu und startet den Dienst. Schlägt das fehl, wird der alte Stand wiederhergestellt. Es lässt sich nur die neueste veröffentlichte Version installieren, nie eine frei gewählte.
+
+Bestehende Installationen richten den Update-Dienst einmalig mit `sudo ./install.sh repair` oder `sudo ./install.sh update` und danach einem Neustart des Dienstes ein. Das Programm steht nach einem Update auf einem Release-Tag; `sudo ./install.sh update` springt wieder auf den Stand des Branches `main`. Ein Release auf ein bestimmtes Tag erzwingt `sudo UD_TARGET_REF=v1.2.0 ./install.sh update`.
 
 ### Orte
 

@@ -1,6 +1,6 @@
 # Zoraxy
 
-Das Dashboard zeigt die Proxy-Hosts von Zoraxy mit Erreichbarkeit und Ablauf der Zertifikate. Der Zugriff ist rein lesend und nur für Admins sichtbar. Entscheidung und Gründe: `docs/04-entscheidungen.md`, Nr. 23. Planung und Recherche: Projektordner `zoraxy/plan-zoraxy.md`.
+Das Dashboard zeigt die Proxy-Hosts von Zoraxy mit Erreichbarkeit und Ablauf der Zertifikate. Der Zugriff ist rein lesend und nur für Admins sichtbar. Entscheidung und Gründe: `docs/04-entscheidungen.md`, Nr. 24. Planung und Recherche: Projektordner `zoraxy/plan-zoraxy.md`. Die erste Einschätzung steht in [09-zoraxy-einschaetzung.md](09-zoraxy-einschaetzung.md).
 
 ## Anzeige
 

@@ -15,3 +15,4 @@ export * from './ipam-stats.js';
 export * from './proxmox.js';
 export * from './zoraxy.js';
 export * from './mail.js';
+export * from './update.js';

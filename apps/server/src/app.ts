@@ -39,6 +39,8 @@ import { feedRoutes } from './routes/feeds.js';
 import { FeedService } from './feeds/service.js';
 import { technitiumRoutes } from './routes/technitium.js';
 import { proxmoxRoutes } from './routes/proxmox.js';
+import { updateRoutes } from './routes/update.js';
+import { UpdateError, UpdateService, updateConfigFromEnv } from './update/service.js';
 import { ProxmoxError } from './proxmox/client.js';
 import { zoraxyRoutes } from './routes/zoraxy.js';
 import { ZoraxyError } from './zoraxy/client.js';
@@ -62,6 +64,8 @@ export async function buildApp(
     createMailer?: MailerFactory;
     /** Abruf der RSS-Feeds (Tests ersetzen ihn) und ob der Zeitplan startet */
     feedFetch?: typeof fetch;
+    /** Abruf der GitHub-Veröffentlichungen (Tests ersetzen ihn) */
+    updateFetch?: typeof fetch;
     startFeeds?: boolean;
   } = {},
 ) {
@@ -108,6 +112,9 @@ export async function buildApp(
         request.log.warn({ err: error }, 'Mail-Fehler');
       return reply.code(error.statusCode).send({ error: error.message, code: error.kind });
     }
+    if (error instanceof UpdateError) {
+      return reply.code(error.statusCode).send({ error: error.message, code: error.kind });
+    }
     if (error instanceof ProxmoxError) {
       if (error.kind !== 'not-configured') request.log.warn({ err: error }, 'Proxmox-Fehler');
       return reply.code(error.statusCode).send({ error: error.message, code: error.kind });
@@ -143,6 +150,12 @@ export async function buildApp(
     mail,
   });
   await app.register(mailRoutes, { prefix: '/api', mail });
+  const update = new UpdateService({
+    config: config.update ?? updateConfigFromEnv(),
+    audit,
+    fetchImpl: options.updateFetch,
+  });
+  await app.register(updateRoutes, { prefix: '/api', update });
   await app.register(apiRoutes, { prefix: '/api', repo, events, monitor });
   await app.register(viewRoutes, { prefix: '/api', db });
   const icons =

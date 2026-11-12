@@ -8,6 +8,7 @@ class MenuState {
   zoraxyOpen = $state(false);
   mailOpen = $state(false);
   feedsOpen = $state(false);
+  updateOpen = $state(false);
 }
 
 export const menus = new MenuState();
