@@ -1073,6 +1073,10 @@ main() {
   esac
   require_root
   require_os
+  # Unter systemd (Update aus der Oberfläche) ist HOME nicht gesetzt: git liest dann keine globale
+  # Konfiguration und lehnt den Programmordner (gehört dem Dienstbenutzer) als „dubious ownership“ ab.
+  export HOME="${HOME:-/root}"
+  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0="$APP_DIR"
   if [[ "${1:-}" == "apply-update-request" ]]; then
     # Das Update ersetzt install.sh im Git-Checkout; bash liest Skripte beim Ausführen nach.
     # Deshalb läuft eine Kopie, die vom Checkout unabhängig ist.
