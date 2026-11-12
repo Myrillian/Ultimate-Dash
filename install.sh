@@ -3,7 +3,7 @@
 #
 # Installiert Ultimate Dash ohne Docker als systemd-Dienst auf einem (leeren) Host.
 # Start als root:   sudo ./install.sh
-# Ohne Menü:        sudo ./install.sh <deps|install|repair|update-deps|update|backup|restore|restart|uninstall>
+# Ohne Menü:        sudo ./install.sh <deps|install|repair|update-deps|update|backup|restore|restart|uninstall|migrate-docker>
 # Updates aus der Oberfläche führt der systemd-Dienst ultimate-dash-update aus (apply-update-request).
 #
 # Anpassbar über Umgebungsvariablen (alle optional):
@@ -591,6 +591,112 @@ cmd_restore() {
 }
 
 # ---------------------------------------------------------------------------
+# Umstieg von Docker (git pull + docker compose) auf diese Installation
+# ---------------------------------------------------------------------------
+# Übernimmt Datenbank, Datenordner und Einstellungen (.env) einer Docker-Installation.
+# Der alte Ordner und seine Daten bleiben unverändert (Rollback: docker compose start).
+cmd_migrate_docker() { # migrate_docker [Ordner der Docker-Installation]
+  local src="${1:-${UD_DOCKER_DIR:-}}" src_data src_env was_active=0 key line stamp pre_archive
+  local -a tar_items=(data)
+  local fresh=0
+  if [[ -z "$src" ]]; then
+    src="$(ask 'Ordner der Docker-Installation (mit docker-compose.yml und data/)' "$PWD")"
+  fi
+  src="$(readlink -f "$src" 2>/dev/null || echo "$src")"
+  src_data="$src/data"
+  src_env="$src/.env"
+  [[ -f "$src_data/$DB_NAME" ]] || die "Keine Datenbank gefunden: $src_data/$DB_NAME (Ordner mit docker-compose.yml angeben)."
+  [[ "$src_data" != "$DATA_DIR" ]] || die "Quelle und Ziel sind derselbe Ordner."
+
+  warn "Der Docker-Container wird gestoppt (nicht gelöscht). Danach übernimmt der systemd-Dienst die Daten."
+  confirm "Umstieg von $src auf $APP_DIR jetzt durchführen?" n || {
+    info "Abgebrochen."
+    return 0
+  }
+
+  # 1. Docker anhalten, damit die Datenbank konsistent ist (WAL wird beim Beenden geschrieben).
+  if command -v docker >/dev/null 2>&1; then
+    if [[ -f "$src/docker-compose.yml" ]]; then
+      info "Stoppe den Docker-Container"
+      (cd "$src" && docker compose stop) || warn "docker compose stop ist fehlgeschlagen – bitte den Container selbst stoppen"
+    fi
+    if [[ -n "$(docker ps -q --filter name=^ultimate-dash$ 2>/dev/null)" ]]; then
+      die "Der Container ultimate-dash läuft noch. Erst stoppen: docker stop ultimate-dash"
+    fi
+  else
+    warn "Docker nicht gefunden – stelle sicher, dass der Container gestoppt ist."
+  fi
+
+  # 2. Sicherung der alten Daten (unabhängig vom Ziel)
+  install -d -m 0700 "$BACKUP_DIR"
+  stamp="$(date +%Y%m%d-%H%M%S)"
+  pre_archive="$BACKUP_DIR/docker-vor-umstieg-${stamp}.tar.gz"
+  [[ -f "$src_env" ]] && tar_items+=(.env)
+  (umask 077 && tar -C "$src" -czf "$pre_archive" "${tar_items[@]}")
+  ok "Sicherung der Docker-Daten: $pre_archive"
+
+  # 3. Programm installieren, falls noch nicht vorhanden (fragt nach Port und Adresse).
+  if ! app_installed || ! service_exists; then
+    cmd_install
+    fresh=1
+  fi
+  ensure_user_and_dirs
+  if service_active; then
+    was_active=1
+    systemctl stop "$SERVICE_NAME"
+  fi
+
+  # 4. Daten übernehmen. Vorhandene Daten im Ziel werden vorher gesichert.
+  if ((!fresh)) && [[ -f "$DATA_DIR/$DB_NAME" ]]; then
+    warn "Im Ziel ($DATA_DIR) liegt bereits eine Datenbank. Sie wird durch die Docker-Daten ersetzt."
+    confirm "Ziel-Daten ersetzen?" n || {
+      ((was_active)) && systemctl start "$SERVICE_NAME"
+      die "Abgebrochen – nichts verändert."
+    }
+    (umask 077 && tar -C "$DATA_DIR" -czf "$BACKUP_DIR/ziel-vor-umstieg-${stamp}.tar.gz" .)
+  fi
+  find "$DATA_DIR" -mindepth 1 -maxdepth 1 ! -name update -exec rm -rf {} +
+  cp -a "$src_data/." "$DATA_DIR/"
+  chown -R "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR"
+  chmod 0750 "$DATA_DIR"
+  ok "Daten nach $DATA_DIR kopiert"
+
+  # 5. Einstellungen aus der .env übernehmen (ohne die von diesem Skript verwalteten Schlüssel).
+  if [[ -f "$src_env" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || continue
+      key="${line%%=*}"
+      case "$key" in
+        NODE_ENV | HOST | PORT | DATA_DIR | WEB_ROOT) continue ;;
+      esac
+      if grep -q "^${key}=" "$ENV_FILE"; then
+        warn "$key steht schon in $ENV_FILE – nicht überschrieben"
+      else
+        printf '%s\n' "$line" >>"$ENV_FILE"
+      fi
+    done <"$src_env"
+    ok "Einstellungen aus $src_env nach $ENV_FILE übernommen"
+  else
+    info "Keine .env im alten Ordner – es gibt nichts zu übernehmen"
+  fi
+  chown root:"$SERVICE_USER" "$ENV_FILE"
+  chmod 0640 "$ENV_FILE"
+
+  # 6. Starten
+  if start_service; then
+    cat <<EOF
+
+${C_BOLD}Umstieg abgeschlossen.${C_OFF} Melde dich mit deinem bisherigen Konto an.
+  Der Docker-Container bleibt gestoppt: $src (nach einigen Tagen aufräumen: docker compose down)
+  Rollback: sudo systemctl stop $SERVICE_NAME && (cd $src && docker compose start)
+EOF
+  else
+    err "Start fehlgeschlagen. Rollback: sudo systemctl stop $SERVICE_NAME && (cd $src && docker compose start)"
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # 5: Update
 # ---------------------------------------------------------------------------
 cmd_update() {
@@ -950,7 +1056,7 @@ EOF
 
 usage() {
   cat <<EOF
-Aufruf: sudo $0 [deps|install|repair|update-deps|update|backup|restore|restart|uninstall]
+Aufruf: sudo $0 [deps|install|repair|update-deps|update|backup|restore|restart|uninstall|migrate-docker [Ordner]]
 Update auf ein Release: sudo UD_TARGET_REF=v1.2.0 $0 update
 Ohne Argument startet das interaktive Menü.
 EOF
@@ -989,6 +1095,7 @@ main() {
     restore) cmd_restore ;;
     restart) cmd_restart ;;
     uninstall) cmd_uninstall ;;
+    migrate-docker) cmd_migrate_docker "${2:-}" ;;
     *)
       usage
       exit 2

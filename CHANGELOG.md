@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen pro Version. Der Abschnitt einer Version ist zugleich der Text der GitHub-Veröffentlichung und wird Admins in der Update-Prüfung vor der Installation angezeigt.
 
+## [Unveröffentlicht]
+
+### Installation
+
+- `install.sh migrate-docker` übernimmt Daten und Einstellungen einer Docker-Installation (siehe Installationsanleitung)
+
 ## [1.0.0] – 2026-11-12
 
 Erste offizielle Veröffentlichung.
