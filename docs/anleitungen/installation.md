@@ -106,6 +106,23 @@ Das Menü bietet genau diese Punkte:
 
 Ohne Menü, z. B. für Automatisierung: `sudo ./install.sh <deps|install|repair|update-deps|update|backup|restore|restart|uninstall>`. Mit `UD_ASSUME_YES=1` werden Rückfragen mit „ja“ beantwortet; `UD_PURGE=1` löscht bei `uninstall` zusätzlich Daten, Konfiguration und Benutzer.
 
+### Umstieg von Docker auf das Installationsskript
+
+Wer Ultimate Dash bisher mit `git pull` und `docker compose up -d --build` betreibt, kann Daten und Einstellungen übernehmen. Alles steht in der Datenbank `data/ultimate-dash.db` (Benutzer, Dashboards, Verbindungen, Zugangsdaten) und in der optionalen `.env`. Einen separaten Schlüssel gibt es nicht.
+
+```bash
+# 1. Skript holen (am besten in einen neuen Ordner, nicht in den Docker-Checkout)
+git clone https://github.com/myrillian/ultimate-dash.git ~/ultimate-dash-install
+cd ~/ultimate-dash-install
+
+# 2. Umstieg (Ordner = dein bisheriger Docker-Ordner mit docker-compose.yml und data/)
+sudo ./install.sh migrate-docker ~/ultimate-dash
+```
+
+Das Skript stoppt den Container (er wird nicht gelöscht), sichert `data` und `.env` nach `/var/backups/ultimate-dash/docker-vor-umstieg-….tar.gz`, installiert Ultimate Dash samt systemd-Dienst, kopiert die Daten nach `/var/lib/ultimate-dash`, übernimmt die Einstellungen aus `.env` in `/etc/ultimate-dash/ultimate-dash.env` (`PORT`, `DATA_DIR` und `WEB_ROOT` bleiben die des Skripts) und startet den Dienst. Danach reicht die bisherige Anmeldung. Port und `PUBLIC_URL` fragt die Installation ab; nimm denselben Port wie bisher (Standard 3000), damit Proxy und Lesezeichen weiter passen.
+
+Rollback, falls etwas nicht stimmt: `sudo systemctl stop ultimate-dash && cd ~/ultimate-dash && docker compose start`. Der alte Ordner wurde nicht verändert. Wenn alles läuft, kannst du den Container nach einigen Tagen mit `docker compose down` entfernen. Künftige Updates macht **Einstellungen › Updates** oder `sudo ./install.sh update`.
+
 ### Updates aus der Oberfläche
 
 Bei einer Installation mit `install.sh` installiert **Einstellungen › Updates** neue Versionen direkt. Ablauf: Der Admin sieht das Änderungsprotokoll aller neueren Veröffentlichungen, muss ausdrücklich bestätigen, und der Server legt eine Anfrage im Datenordner ab. Der root-Dienst `ultimate-dash-update` (ausgelöst über `ultimate-dash-update.path`) prüft sie, legt ein Backup an, wechselt auf das Release-Tag, baut neu und startet den Dienst. Schlägt das fehl, wird der alte Stand wiederhergestellt. Es lässt sich nur die neueste veröffentlichte Version installieren, nie eine frei gewählte.
