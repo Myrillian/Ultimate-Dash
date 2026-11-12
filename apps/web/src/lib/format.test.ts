@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatCount,
+  formatDays,
   formatAgo,
   formatDuration,
   formatLeaseTime,
@@ -67,5 +68,15 @@ describe('Lease-Zeiten', () => {
     expect(formatLeaseTime('11/07/2026 20:00:00')).toBe('07.11.26, 20:00');
     expect(formatLeaseTime('irgendwas')).toBe('irgendwas');
     expect(formatLeaseTime(null)).toBe('–');
+  });
+});
+
+describe('formatDays', () => {
+  it('beschreibt die Restlaufzeit', () => {
+    expect(formatDays(30)).toBe('30 Tage');
+    expect(formatDays(1)).toBe('1 Tag');
+    expect(formatDays(0)).toBe('läuft heute ab');
+    expect(formatDays(-1)).toBe('seit 1 Tag abgelaufen');
+    expect(formatDays(-3)).toBe('seit 3 Tagen abgelaufen');
   });
 });

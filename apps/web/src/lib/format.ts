@@ -110,3 +110,10 @@ export function formatUptime(seconds: number): string {
   if (hours >= 1) return `${hours} Std.`;
   return `${Math.max(1, Math.floor(seconds / 60))} Min.`;
 }
+
+/** Restlaufzeit eines Zertifikats: 0 → „läuft heute ab“, 5 → „5 Tage“, -2 → „seit 2 Tagen abgelaufen“. */
+export function formatDays(days: number): string {
+  if (days < 0) return `seit ${-days} ${-days === 1 ? 'Tag' : 'Tagen'} abgelaufen`;
+  if (days === 0) return 'läuft heute ab';
+  return `${days} ${days === 1 ? 'Tag' : 'Tage'}`;
+}

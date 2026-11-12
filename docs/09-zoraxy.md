@@ -1,30 +1,48 @@
-# Zoraxy-Integration: Einschätzung
+# Zoraxy
 
-Stand: 12.11.2026. Ergebnis einer ersten Recherche, noch keine Umsetzung.
+Das Dashboard zeigt die Proxy-Hosts von Zoraxy mit Erreichbarkeit und Ablauf der Zertifikate. Der Zugriff ist rein lesend und nur für Admins sichtbar. Entscheidung und Gründe: `docs/04-entscheidungen.md`, Nr. 24. Planung und Recherche: Projektordner `zoraxy/plan-zoraxy.md`. Die erste Einschätzung steht in [09-zoraxy-einschaetzung.md](09-zoraxy-einschaetzung.md).
 
-## Kurzfassung
+## Anzeige
 
-Eine lesende Anbindung ist sehr wahrscheinlich machbar, denn Zoraxy hat eine eigene Verwaltungs-Oberfläche, die über JSON-Endpunkte unter `/api/…` arbeitet. **Offen ist die Anmeldung**: Die README nennt weder eine dokumentierte API noch API-Tokens. Bevor Code entsteht, muss an einer echten Zoraxy-Instanz geklärt werden, ob es einen API-Schlüssel (Bearer-Token) gibt oder nur die Sitzung mit Benutzername und Passwort. Diese Punkte konnte ich ohne Zugriff auf eine Instanz nicht bestätigen; die genannten Pfade stammen aus dem Gedächtnis und sind unverifiziert.
+Unter dem Proxmox-Bereich, über den Gruppen, in zwei Größen (Umschalter rechts, Wahl pro Browser):
 
-Belegt (README des Projekts): Reverse-Proxy mit HTTP/2, Lastverteilung und WebSocket, Weiterleitungsregeln, TLS mit ACME, IP- und Länder-Sperrlisten, Stream-Proxy (TCP/UDP), integrierter Uptime-Monitor, Plugin-System, Forward-Auth/OAuth2.
+- **Balken (Standard):** Anzahl aktiver Hosts, „erreichbar x / y“, Tage bis zum nächsten Ablauf eines Zertifikats (gelb ab 14, rot ab 3 Tagen), Anfragen des Tages mit Fehlern und ein Hinweis „n Probleme“.
+- **Liste:** vier Kacheln (Hosts, Erreichbar, Zertifikate, Anfragen heute) und darunter die Proxy-Hosts mit Statuspunkt, erstem Ziel und Restlaufzeit des Zertifikats. Hosts mit Problemen (nicht erreichbar, Zertifikat läuft in höchstens 14 Tagen ab) stehen oben.
 
-## Sinnvolle Funktionen (nach Nutzen)
+Ist Zoraxy nicht verbunden, sehen Admins den Hinweis „Zoraxy verbinden“. Bei einem Fehler bleibt der letzte Stand sichtbar und abgeblendet.
 
-1. **Proxy-Regeln als Dienste anzeigen und importieren.** Jede Regel (Domain → Ziel) ist ein Dashboard-Eintrag. Ein Import-Vorschlag „Dienste aus Zoraxy übernehmen“ spart Handarbeit und hält Dashboard und Proxy deckungsgleich. Nur Vorschlagsliste, nie automatisch überschreiben (wie beim IPAM-Abgleich, Entscheidung 11).
-2. **Statusabgleich.** Zoraxy führt einen Uptime-Monitor. Das Dashboard kann dessen Ergebnis neben der eigenen Statusprüfung zeigen (z. B. „Proxy erreichbar, Ziel nicht“).
-3. **Zertifikate.** Ablaufdatum der TLS-Zertifikate je Domain; Warnung unter 14 Tagen.
-4. **Kennzahlen.** Anfragen, Fehlerquote, gesperrte Zugriffe als kleine Leiste neben DNS und Proxmox.
-5. **Domains mit Technitium abgleichen** (IPAM): Zoraxy-Domain ohne DNS-Eintrag oder DNS-Eintrag ohne Proxy-Regel.
+## Einrichten
 
-Nicht empfohlen: Regeln aus dem Dashboard heraus ändern. Ein Fehler dort legt alle Dienste lahm; das passt nicht zum bisherigen Prinzip „erst lesen, Schreiben nur gezielt“ (Proxmox, Entscheidung 19).
+Einstellungen › „Verbindungen › Zoraxy“: Adresse der Verwaltungsoberfläche (z. B. `http://zoraxy.home.lan:8000`), Benutzername, Passwort, optional „Zertifikat nicht prüfen“. „Verbindung prüfen“ zeigt Version, Anzahl Hosts und Zertifikate; gespeichert wird nur eine funktionierende Verbindung.
 
-## Umsetzungsskizze
+Alternativ per Umgebungsvariablen `ZORAXY_URL`, `ZORAXY_USERNAME`, `ZORAXY_PASSWORD`, `ZORAXY_TLS_INSECURE=true`. Dann ist die Verbindung in der Oberfläche nur lesbar.
 
-- Einstellung `zoraxy` (URL, Zugang, „Zertifikat nicht prüfen“) oder `ZORAXY_*`-Variablen, nur Admins, Aufrufe nur über das Backend, feste Pfadliste mit `GET`, kurzer Zwischenspeicher – wie bei Proxmox.
-- Verbindungstest zeigt, welche Rechte der Zugang hat.
+## Zugang und Sicherheit
 
-## Zu klären, bevor es losgeht
+Zoraxy hat keine API-Tokens und nur ein einziges Konto mit Vollzugriff. Der Server meldet sich deshalb mit diesem Konto an (`POST /api/auth/login`), hält Sitzungs-Cookie und, falls Zoraxy eines liefert, das CSRF-Token der Startseite (`<meta name="zoraxy.csrf.Token">`) nur im Speicher und meldet sich bei Ablauf selbst neu an.
 
-1. Gibt es in der eingesetzten Zoraxy-Version API-Schlüssel? Falls nein: Anmeldung per Sitzungscookie nachbauen (Passwort im Dashboard speichern) oder Plugin?
-2. Welche Version läuft, und gibt es mehrere Zoraxy-Instanzen?
-3. Reichen Import und Status, oder soll auch Zertifikats- und Kennzahlen-Anzeige rein?
+Technisch erzwungen ist, dass nichts verändert wird: Der Client kennt nur `GET` auf fünf Pfaden (Anmeldung ausgenommen):
+
+| Pfad | Zweck |
+| --- | --- |
+| `/api/proxy/list?type=host` | Proxy-Regeln (Pflicht) |
+| `/api/cert/list?date=true` | Zertifikate mit Ablaufdatum |
+| `/api/utm/list` | Uptime-Monitor |
+| `/api/stats/summary` | Anfragen des Tages |
+| `/api/info/x` | Version (ohne Anmeldung) |
+
+Fallen Zertifikate, Uptime oder Anfragen aus, bleibt der Rest sichtbar und der Bereich nennt, was fehlt; nur die Hostliste ist Pflicht. Das Passwort steht in der SQLite-Datei (wie die Tokens von Technitium und Proxmox) oder in der Umgebung, geht nie an den Browser und taucht in keiner Antwort auf. Benutzernamen und Hashes der Basic-Auth-Regeln werden nicht weitergegeben. Zwischenspeicher im Server 15 Sekunden, der Browser fragt alle 15 Sekunden, solange der Tab sichtbar ist.
+
+## Berechnung
+
+- **Erreichbar:** letzter Wert des Uptime-Monitors von Zoraxy; zugeordnet über den Hostnamen der überwachten Adresse zu Domain oder Alias der Regel. Ohne Eintrag gilt der Host als „nicht überwacht“.
+- **Zertifikat:** Ein Host erhält das genau passende Zertifikat, sonst ein Wildcard-Zertifikat (`*.example.org` deckt genau eine Ebene; Zoraxy-Dateiname `_.example.org`). Bei mehreren Namen (Alias) zählt der kürzeste Wert.
+- **Nächster Ablauf:** kürzeste Restlaufzeit aller Zertifikate.
+
+## Stand der Prüfung
+
+Die Zoraxy-API ist nicht als stabile, öffentliche Schnittstelle dokumentiert; Pfade und Felder stammen aus dem Quellcode (Version 3.3.x) und werden bewusst locker gelesen (unbekannte Felder ignoriert, Groß-/Kleinschreibung egal). Tests laufen gegen einen Fake-Server (`pnpm --filter @ultimate-dash/server fake:zoraxy`, Port 8000, Benutzer `admin`), der Anmeldung, Cookie und CSRF nachbildet. Ein Test gegen eine echte Zoraxy-Instanz steht noch aus; Abweichungen zeigt „Verbindung prüfen“.
+
+## Nicht enthalten
+
+Schreibende Aktionen, Zugriffs-Logs, Länderkarte, Stream-Proxy und Weiterleitungen, Verknüpfung mit Diensten und IPAM (siehe Plan, Stufen 4 und 5).

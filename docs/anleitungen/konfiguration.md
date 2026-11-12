@@ -30,6 +30,7 @@ Unter **Einstellungen** (oben rechts):
 | Admin › Benutzer verwalten | Admins | Benutzer anlegen, Rolle und E-Mail ändern, Passwort setzen, Reset-Link erzeugen, löschen |
 | Verbindungen › Technitium DNS | Admins | Hauptverbindung zu Technitium, siehe [Anleitung](technitium.md) |
 | Verbindungen › Proxmox VE | Admins | Verbindung zu Proxmox, siehe [Anleitung](proxmox.md) |
+| Verbindungen › Zoraxy | Admins | Verbindung zu Zoraxy, siehe [Zoraxy](../09-zoraxy.md) |
 | Verbindungen › Mailserver | Admins | SMTP für „Passwort vergessen“, siehe unten |
 | Verbindungen › Feeds verwalten | Admins | RSS-Feeds hinzufügen, abschalten, löschen |
 | Backup | alle | eigenes Dashboard als YAML exportieren, importieren oder von anderen Benutzern kopieren |
@@ -39,7 +40,7 @@ Weitere DHCP-Server von Technitium richtest du auf der DHCP-Seite über das Zahn
 ## Benutzer und Rollen
 
 - **Administrator:** darf alles bearbeiten und Benutzer verwalten.
-- **Benutzer:** bearbeitet das eigene Dashboard, sieht IPAM, DHCP und DNS, ändert dort aber nichts. Den Proxmox-Bereich sehen nur Admins.
+- **Benutzer:** bearbeitet das eigene Dashboard, sieht IPAM, DHCP und DNS, ändert dort aber nichts. Den Proxmox- und den Zoraxy-Bereich sehen nur Admins.
 
 Jeder hat ein eigenes Dashboard. IPAM, DNS und DHCP sind für alle gleich. Passwörter werden mit scrypt gespeichert, Sitzungen laufen 30 Tage und verlängern sich bei Nutzung. Nach zehn Fehlversuchen in 15 Minuten wird die Anmeldung für diesen Benutzernamen und diese IP kurz gesperrt.
 
@@ -117,6 +118,8 @@ Konten werden über den `sub`-Claim zugeordnet, eine Umbenennung beim Anbieter i
 | `TECHNITIUM_TLS_INSECURE` | `true` = Zertifikat nicht prüfen |
 | `PROXMOX_URL`, `PROXMOX_TOKEN_ID`, `PROXMOX_TOKEN_SECRET` | Verbindung zu Proxmox |
 | `PROXMOX_TLS_INSECURE` | `true` = Zertifikat nicht prüfen |
+| `ZORAXY_URL`, `ZORAXY_USERNAME`, `ZORAXY_PASSWORD` | Verbindung zu Zoraxy (Admin-Konto) |
+| `ZORAXY_TLS_INSECURE` | `true` = Zertifikat nicht prüfen |
 
 Details in den Anleitungen zu [Technitium](technitium.md) und [Proxmox](proxmox.md).
 

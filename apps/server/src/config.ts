@@ -6,6 +6,8 @@ import type { TechnitiumConnection } from './technitium/client.js';
 import { connectionFromEnv } from './technitium/service.js';
 import type { ProxmoxConnection } from './proxmox/client.js';
 import { proxmoxFromEnv } from './proxmox/service.js';
+import type { ZoraxyConnection } from './zoraxy/client.js';
+import { zoraxyFromEnv } from './zoraxy/service.js';
 import { updateConfigFromEnv, type UpdateConfig } from './update/service.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -46,6 +48,8 @@ export interface AppConfig {
   technitium?: TechnitiumConnection | null;
   /** Feste Proxmox-Verbindung aus PROXMOX_URL/PROXMOX_TOKEN_ID/PROXMOX_TOKEN_SECRET, sonst wie oben. */
   proxmox?: ProxmoxConnection | null;
+  /** Feste Zoraxy-Verbindung aus ZORAXY_URL/ZORAXY_USERNAME/ZORAXY_PASSWORD, sonst wie oben. */
+  zoraxy?: ZoraxyConnection | null;
   /** Update-Prüfung (UPDATE_CHECK, UPDATE_REPO …); fehlt das Feld (Tests), werden die Umgebungsvariablen gelesen. */
   update?: UpdateConfig;
 }
@@ -69,6 +73,7 @@ export function loadConfig(): AppConfig {
     publicUrl: publicUrlFromEnv(),
     technitium: connectionFromEnv(),
     proxmox: proxmoxFromEnv(),
+    zoraxy: zoraxyFromEnv(),
     update: updateConfigFromEnv(),
   };
 }

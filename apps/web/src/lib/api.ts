@@ -75,6 +75,10 @@ import type {
   ProxmoxSettingsInput,
   ProxmoxSummary,
   ProxmoxTestResult,
+  ZoraxySettings,
+  ZoraxySettingsInput,
+  ZoraxySummary,
+  ZoraxyTestResult,
   UpdateInstallInput,
   UpdateStatus,
 } from '@ultimate-dash/shared';
@@ -176,6 +180,13 @@ export const api = {
     request<ProxmoxTestResult>('POST', '/proxmox/test', input),
   disconnectProxmox: () => request<void>('DELETE', '/proxmox/settings'),
   proxmoxSummary: () => request<ProxmoxSummary>('GET', '/proxmox/summary'),
+  zoraxySettings: () => request<ZoraxySettings>('GET', '/zoraxy/settings'),
+  saveZoraxy: (input: ZoraxySettingsInput) =>
+    request<ZoraxyTestResult>('PUT', '/zoraxy/settings', input),
+  testZoraxy: (input: ZoraxySettingsInput) =>
+    request<ZoraxyTestResult>('POST', '/zoraxy/test', input),
+  disconnectZoraxy: () => request<void>('DELETE', '/zoraxy/settings'),
+  zoraxySummary: () => request<ZoraxySummary>('GET', '/zoraxy/summary'),
 
   technitiumSettings: () => request<TechnitiumSettings>('GET', '/technitium/settings'),
   saveTechnitium: (input: TechnitiumSettingsInput) =>

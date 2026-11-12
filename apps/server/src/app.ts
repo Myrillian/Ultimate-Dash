@@ -42,6 +42,9 @@ import { proxmoxRoutes } from './routes/proxmox.js';
 import { updateRoutes } from './routes/update.js';
 import { UpdateError, UpdateService, updateConfigFromEnv } from './update/service.js';
 import { ProxmoxError } from './proxmox/client.js';
+import { zoraxyRoutes } from './routes/zoraxy.js';
+import { ZoraxyError } from './zoraxy/client.js';
+import { zoraxyFromEnv, ZoraxyService } from './zoraxy/service.js';
 import { proxmoxFromEnv, ProxmoxService } from './proxmox/service.js';
 import { TechnitiumError } from './technitium/client.js';
 import { DhcpService } from './technitium/dhcp.js';
@@ -116,6 +119,10 @@ export async function buildApp(
       if (error.kind !== 'not-configured') request.log.warn({ err: error }, 'Proxmox-Fehler');
       return reply.code(error.statusCode).send({ error: error.message, code: error.kind });
     }
+    if (error instanceof ZoraxyError) {
+      if (error.kind !== 'not-configured') request.log.warn({ err: error }, 'Zoraxy-Fehler');
+      return reply.code(error.statusCode).send({ error: error.message, code: error.kind });
+    }
     const status = (error as { statusCode?: number }).statusCode;
     if (status && status < 500) return reply.code(status).send({ error: (error as Error).message });
     request.log.error({ err: error }, 'Unerwarteter Fehler');
@@ -173,6 +180,12 @@ export async function buildApp(
     envConnection: config.proxmox === undefined ? proxmoxFromEnv() : config.proxmox,
   });
   await app.register(proxmoxRoutes, { prefix: '/api', proxmox });
+  const zoraxy = new ZoraxyService({
+    db,
+    audit,
+    envConnection: config.zoraxy === undefined ? zoraxyFromEnv() : config.zoraxy,
+  });
+  await app.register(zoraxyRoutes, { prefix: '/api', zoraxy });
   const dhcp = new DhcpService(technitium, db);
   await app.register(technitiumRoutes, { prefix: '/api', technitium, dhcp, audit });
   const ipam = new IpamRepository(db, audit);
@@ -284,5 +297,17 @@ export async function buildApp(
     close();
   });
 
-  return { app, repo, authStore, monitor, events, technitium, proxmox, audit, scanner, feeds };
+  return {
+    app,
+    repo,
+    authStore,
+    monitor,
+    events,
+    technitium,
+    proxmox,
+    zoraxy,
+    audit,
+    scanner,
+    feeds,
+  };
 }

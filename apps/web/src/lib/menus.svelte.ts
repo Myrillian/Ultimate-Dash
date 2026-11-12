@@ -5,6 +5,7 @@ class MenuState {
   technitiumOpen = $state(false);
   technitiumServersOpen = $state(false);
   proxmoxOpen = $state(false);
+  zoraxyOpen = $state(false);
   mailOpen = $state(false);
   feedsOpen = $state(false);
   updateOpen = $state(false);

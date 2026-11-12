@@ -44,6 +44,7 @@ Danach `http://<IP des Hosts>:3000` öffnen und das erste Administrator-Konto an
 | [IP-Verwaltung](docs/05-ip-verwaltung.md), [IP-Statistik](docs/06-ip-statistik.md) | Konzept der IP-Ansicht und Kennzahlen je Netz                  |
 | [RSS-Feeds](docs/06-rss-feeds.md)                                                  | Abruf, Speicherung, mitgelieferte Feeds                        |
 | [Proxmox](docs/07-proxmox.md)                                                      | Technische Details der Anbindung                               |
+| [Zoraxy](docs/09-zoraxy.md)                                                        | Reverse-Proxy-Hosts, Zertifikate, Anbindung                    |
 | [Rechtliches](docs/rechtliches.md)                                                 | Lizenz, Haftung, Datenschutz, Feeds, Marken                    |
 | [Veröffentlichung](docs/08-veroeffentlichung.md)                                   | Prüfbericht vor der Veröffentlichung, offene Fragen            |
 
@@ -174,6 +175,10 @@ pveum acl modify / --tokens 'dashboard@pve!ultimate-dash' --roles PVEAuditor
 ```
 
 Schritt für Schritt, auch über die Weboberfläche: [Anleitung Proxmox](docs/anleitungen/proxmox.md).
+
+## Zoraxy
+
+Ist Zoraxy verbunden, sehen Admins unter dem Proxmox-Bereich die Proxy-Hosts mit Erreichbarkeit (Uptime-Monitor von Zoraxy), die Restlaufzeit der Zertifikate und die Anfragen des Tages. Der Zugriff ist rein lesend. Zoraxy hat keine API-Tokens, Ultimate Dash meldet sich daher mit dem Admin-Konto an (nur im Server gespeichert). **Einrichten:** Einstellungen › _Verbindungen › Zoraxy_ oder `ZORAXY_URL`, `ZORAXY_USERNAME`, `ZORAXY_PASSWORD`. Details: [Zoraxy](docs/09-zoraxy.md).
 
 ## IPAM
 
