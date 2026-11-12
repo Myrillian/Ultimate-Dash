@@ -3,7 +3,8 @@
 #
 # Installiert Ultimate Dash ohne Docker als systemd-Dienst auf einem (leeren) Host.
 # Start als root:   sudo ./install.sh
-# Ohne Menü:        sudo ./install.sh <deps|install|repair|update-deps|update|backup|restore>
+# Ohne Menü:        sudo ./install.sh <deps|install|repair|update-deps|update|backup|restore|restart|uninstall>
+# Updates aus der Oberfläche führt der systemd-Dienst ultimate-dash-update aus (apply-update-request).
 #
 # Anpassbar über Umgebungsvariablen (alle optional):
 #   UD_REPO_URL   Git-Quelle           (Standard: https://github.com/myrillian/ultimate-dash.git)
@@ -15,6 +16,7 @@
 #   UD_PORT       Port bei Neuinstallation (Standard: 3000)
 #   UD_ASSUME_YES=1  Rückfragen automatisch mit „ja“ beantworten (für Automatisierung)
 #   UD_PURGE=1       Bei „uninstall“ auch Daten, Konfiguration und Benutzer löschen
+#   UD_TARGET_REF    Bei „update“ ein Release-Tag (z. B. v1.2.0) statt des Branch-Stands installieren
 set -Eeuo pipefail
 
 REPO_URL="${UD_REPO_URL:-https://github.com/myrillian/ultimate-dash.git}"
@@ -27,6 +29,14 @@ ENV_FILE="$CONF_DIR/ultimate-dash.env"
 SERVICE_NAME="ultimate-dash"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 SERVICE_USER="ultimate-dash"
+# Update aus der Oberfläche: Der Dienst legt die Anfrage in UPDATE_DIR ab, eine systemd-Path-Unit
+# (root) startet daraufhin ultimate-dash-update.service. Den Status schreibt nur root nach /run.
+UPDATE_NAME="ultimate-dash-update"
+UPDATE_DIR="$DATA_DIR/update"
+UPDATE_REQUEST_FILE="$UPDATE_DIR/request"
+UPDATE_STATUS_FILE="/run/${UPDATE_NAME}/status.json"
+UPDATE_SERVICE_FILE="/etc/systemd/system/${UPDATE_NAME}.service"
+UPDATE_PATH_FILE="/etc/systemd/system/${UPDATE_NAME}.path"
 DB_NAME="ultimate-dash.db"
 NODE_MAJOR=22 # package.json: engines.node ">=22"
 DEFAULT_PORT="${UD_PORT:-3000}"
@@ -99,6 +109,8 @@ cleanup() {
   for d in "${TMP_DIRS[@]:-}"; do
     if [[ -n "$d" ]]; then rm -rf "$d"; fi
   done
+  # Kopie des Skripts bei Updates aus der Oberfläche (siehe main)
+  if [[ -n "${UD_SELF_COPY:-}" ]]; then rm -f "$UD_SELF_COPY"; fi
   return 0
 }
 trap cleanup EXIT
@@ -262,6 +274,7 @@ ensure_user_and_dirs() {
   fi
   install -d -m 0755 -o "$SERVICE_USER" -g "$SERVICE_USER" "$APP_DIR"
   install -d -m 0750 -o "$SERVICE_USER" -g "$SERVICE_USER" "$DATA_DIR"
+  install -d -m 0750 -o "$SERVICE_USER" -g "$SERVICE_USER" "$UPDATE_DIR"
   install -d -m 0750 -o root -g "$SERVICE_USER" "$CONF_DIR"
   install -d -m 0700 -o root -g root "$BACKUP_DIR"
 }
@@ -304,6 +317,8 @@ User=$SERVICE_USER
 Group=$SERVICE_USER
 WorkingDirectory=$APP_DIR/apps/server
 EnvironmentFile=$ENV_FILE
+Environment=UD_UPDATE_REQUEST_FILE=$UPDATE_REQUEST_FILE
+Environment=UD_UPDATE_STATUS_FILE=$UPDATE_STATUS_FILE
 ExecStart=$(command -v node) dist/main.js
 Restart=on-failure
 RestartSec=5
@@ -328,6 +343,57 @@ WantedBy=multi-user.target
     ok "systemd-Dienst geschrieben: $SERVICE_FILE"
   fi
   systemctl enable "$SERVICE_NAME" >/dev/null 2>&1
+  write_update_units
+}
+
+# Einrichtung des Update-Dienstes, damit Admins Updates aus der Oberfläche anstoßen können.
+write_update_units() {
+  local unit path changed=0
+  unit="[Unit]
+Description=Ultimate Dash – Update aus der Oberfläche installieren
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RuntimeDirectory=$UPDATE_NAME
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+Environment=UD_ASSUME_YES=1
+Environment=UD_REPO_URL=$REPO_URL
+Environment=UD_BRANCH=$BRANCH
+Environment=UD_APP_DIR=$APP_DIR
+Environment=UD_DATA_DIR=$DATA_DIR
+Environment=UD_CONF_DIR=$CONF_DIR
+Environment=UD_BACKUP_DIR=$BACKUP_DIR
+ExecStart=/bin/bash $APP_DIR/install.sh apply-update-request
+TimeoutStartSec=3600
+"
+  path="[Unit]
+Description=Ultimate Dash – wartet auf eine Update-Anfrage aus der Oberfläche
+
+[Path]
+PathExists=$UPDATE_REQUEST_FILE
+Unit=${UPDATE_NAME}.service
+
+[Install]
+WantedBy=multi-user.target
+"
+  if [[ ! -f "$UPDATE_SERVICE_FILE" ]] || [[ "$(cat "$UPDATE_SERVICE_FILE")" != "${unit%$'\n'}" ]]; then
+    printf '%s' "$unit" >"$UPDATE_SERVICE_FILE"
+    chmod 0644 "$UPDATE_SERVICE_FILE"
+    changed=1
+  fi
+  if [[ ! -f "$UPDATE_PATH_FILE" ]] || [[ "$(cat "$UPDATE_PATH_FILE")" != "${path%$'\n'}" ]]; then
+    printf '%s' "$path" >"$UPDATE_PATH_FILE"
+    chmod 0644 "$UPDATE_PATH_FILE"
+    changed=1
+  fi
+  ((changed)) && systemctl daemon-reload
+  systemctl enable "${UPDATE_NAME}.path" >/dev/null 2>&1
+  # Ein Neustart des Path-Units wäre mitten in einem laufenden Update unnötig riskant.
+  systemctl is-active --quiet "${UPDATE_NAME}.path" || systemctl start "${UPDATE_NAME}.path"
+  ((changed)) && ok "Update-Dienst für die Oberfläche eingerichtet" || true
 }
 
 fetch_source() {
@@ -335,9 +401,15 @@ fetch_source() {
     info "Hole Änderungen von $REPO_URL ($BRANCH)"
     git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
     git -C "$APP_DIR" remote set-url origin "$REPO_URL"
-    git -C "$APP_DIR" fetch --prune origin "$BRANCH" || return 1
-    git -C "$APP_DIR" checkout -q -B "$BRANCH" "origin/$BRANCH" || return 1
-    git -C "$APP_DIR" reset -q --hard "origin/$BRANCH" || return 1
+    if [[ -n "${UD_TARGET_REF:-}" ]]; then
+      git -C "$APP_DIR" fetch --prune --tags --force origin || return 1
+      git -C "$APP_DIR" checkout -q --detach -f "refs/tags/$UD_TARGET_REF" || return 1
+      git -C "$APP_DIR" reset -q --hard "refs/tags/$UD_TARGET_REF" || return 1
+    else
+      git -C "$APP_DIR" fetch --prune origin "$BRANCH" || return 1
+      git -C "$APP_DIR" checkout -q -B "$BRANCH" "origin/$BRANCH" || return 1
+      git -C "$APP_DIR" reset -q --hard "origin/$BRANCH" || return 1
+    fi
   else
     [[ -z "$(ls -A "$APP_DIR" 2>/dev/null)" ]] ||
       die "$APP_DIR ist nicht leer und kein Git-Checkout. Verschiebe den Inhalt oder setze UD_APP_DIR."
@@ -526,8 +598,14 @@ cmd_update() {
   local old_rev new_rev
   old_rev="$(git -C "$APP_DIR" rev-parse HEAD)"
   git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
-  git -C "$APP_DIR" fetch --prune origin "$BRANCH"
-  new_rev="$(git -C "$APP_DIR" rev-parse "origin/$BRANCH")"
+  if [[ -n "${UD_TARGET_REF:-}" ]]; then
+    git -C "$APP_DIR" fetch --prune --tags --force origin
+    new_rev="$(git -C "$APP_DIR" rev-parse --verify -q "refs/tags/${UD_TARGET_REF}^{commit}")" ||
+      die "Release $UD_TARGET_REF existiert nicht in $REPO_URL."
+  else
+    git -C "$APP_DIR" fetch --prune origin "$BRANCH"
+    new_rev="$(git -C "$APP_DIR" rev-parse "origin/$BRANCH")"
+  fi
   if [[ "$old_rev" == "$new_rev" ]] && [[ -f "$APP_DIR/apps/server/dist/main.js" ]]; then
     ok "Bereits auf dem neuesten Stand (${old_rev:0:8})"
     return 0
@@ -716,6 +794,11 @@ cmd_uninstall() {
     systemctl daemon-reload
     systemctl reset-failed "$SERVICE_NAME" >/dev/null 2>&1 || true
   fi
+  if [[ -f "$UPDATE_PATH_FILE" || -f "$UPDATE_SERVICE_FILE" ]]; then
+    systemctl disable --now "${UPDATE_NAME}.path" >/dev/null 2>&1 || true
+    rm -f "$UPDATE_PATH_FILE" "$UPDATE_SERVICE_FILE"
+    systemctl daemon-reload
+  fi
   if [[ -d "$APP_DIR" ]]; then
     info "Entferne Programmordner $APP_DIR"
     rm -rf "$APP_DIR"
@@ -741,6 +824,66 @@ cmd_uninstall() {
   fi
   ok "Ultimate Dash ist deinstalliert. Backups liegen weiterhin in $BACKUP_DIR."
   info "Node.js, pnpm und Systempakete bleiben installiert (können andere Programme nutzen)."
+}
+
+# ---------------------------------------------------------------------------
+# Update aus der Oberfläche
+# ---------------------------------------------------------------------------
+# Status für die Oberfläche; nur root schreibt ihn (liegt unter /run, nicht im Datenordner).
+update_status() { # update_status <ok|running|failed> <Version> <Meldung>
+  local msg="${3//[\"\\]/}"
+  msg="$(printf '%s' "$msg" | tr -d '\n\r' | cut -c1-300)"
+  install -d -m 0755 "$(dirname "$UPDATE_STATUS_FILE")"
+  printf '{"state":"%s","version":"%s","message":"%s","at":"%s"}\n' \
+    "$1" "$2" "$msg" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$UPDATE_STATUS_FILE.tmp"
+  mv -f "$UPDATE_STATUS_FILE.tmp" "$UPDATE_STATUS_FILE"
+}
+
+# Wird von ultimate-dash-update.service gestartet, sobald das Dashboard eine Anfrage ablegt.
+# Die Anfrage stammt vom (unprivilegierten) Dienstbenutzer: Sie wird streng geprüft und nur als
+# Release-Tag des eigenen Repositorys verwendet, nie als Befehl.
+cmd_apply_update_request() {
+  local raw tag rc
+  if [[ ! -f "$UPDATE_REQUEST_FILE" || -L "$UPDATE_REQUEST_FILE" ]]; then
+    info "Keine Update-Anfrage vorhanden"
+    rm -f "$UPDATE_REQUEST_FILE"
+    return 0
+  fi
+  raw="$(head -c 100 "$UPDATE_REQUEST_FILE" | head -n1 | tr -d '[:space:]')"
+  rm -f "$UPDATE_REQUEST_FILE" # zuerst entfernen, sonst startet die Path-Unit endlos neu
+  if [[ ! "$raw" =~ ^v[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}(-[0-9A-Za-z.-]{1,40})?$ ]]; then
+    update_status failed unbekannt "Ungültige Update-Anfrage"
+    err "Ungültige Update-Anfrage verworfen"
+    return 1
+  fi
+  tag="$raw"
+
+  exec 9>/var/lock/ultimate-dash-install.lock
+  if ! flock -n 9; then
+    update_status failed "$tag" "Ein anderer Lauf des Installationsskripts ist noch aktiv"
+    return 1
+  fi
+  if ! app_installed; then
+    update_status failed "$tag" "Ultimate Dash ist nicht per install.sh installiert"
+    return 1
+  fi
+  update_status running "$tag" "Update wird installiert"
+  info "Update-Anfrage aus der Oberfläche: $tag"
+
+  set +e
+  (
+    set -e
+    UD_TARGET_REF="$tag"
+    cmd_update
+  )
+  rc=$?
+  set -e
+  if ((rc == 0)); then
+    update_status ok "$tag" "Update abgeschlossen"
+  else
+    update_status failed "$tag" "Update fehlgeschlagen, der alte Stand wurde wiederhergestellt. Details: journalctl -u $UPDATE_NAME"
+    return 1
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -808,6 +951,7 @@ EOF
 usage() {
   cat <<EOF
 Aufruf: sudo $0 [deps|install|repair|update-deps|update|backup|restore|restart|uninstall]
+Update auf ein Release: sudo UD_TARGET_REF=v1.2.0 $0 update
 Ohne Argument startet das interaktive Menü.
 EOF
 }
@@ -821,6 +965,18 @@ main() {
   esac
   require_root
   require_os
+  if [[ "${1:-}" == "apply-update-request" ]]; then
+    # Das Update ersetzt install.sh im Git-Checkout; bash liest Skripte beim Ausführen nach.
+    # Deshalb läuft eine Kopie, die vom Checkout unabhängig ist.
+    if [[ -z "${UD_SELF_COPY:-}" ]]; then
+      local copy
+      copy="$(mktemp --suffix=.sh)"
+      cp "${BASH_SOURCE[0]}" "$copy"
+      exec env UD_SELF_COPY="$copy" bash "$copy" apply-update-request
+    fi
+    cmd_apply_update_request
+    return
+  fi
   acquire_lock
   case "${1:-}" in
     '') menu ;;

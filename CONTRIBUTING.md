@@ -50,3 +50,11 @@ pnpm format:check && pnpm check && pnpm test && pnpm build
 ## Lizenz
 
 Mit einem Beitrag erklärst du dich einverstanden, dass er unter der [MIT-Lizenz](LICENSE) des Projekts veröffentlicht wird. Übernimm keinen Code aus Projekten mit unverträglicher Lizenz (z. B. GPL) und nenne die Quelle, wenn du freizügig lizenzierten fremden Code übernimmst.
+
+## Release veröffentlichen
+
+Die Update-Prüfung im Dashboard liest GitHub-Veröffentlichungen. Für ein Release:
+
+1. `version` in `package.json` von `apps/server`, `apps/web` und `packages/shared` anheben.
+2. Tag `vX.Y.Z` setzen und pushen.
+3. Auf GitHub ein Release zu diesem Tag anlegen. Der Text der Release-Notizen ist das Änderungsprotokoll, das Admins vor der Installation bestätigen. Vorabversionen und Entwürfe werden ignoriert.
